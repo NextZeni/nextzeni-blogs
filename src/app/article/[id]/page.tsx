@@ -190,7 +190,7 @@ export default function ArticlePage() {
         <div className="max-w-[1300px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-5">
             <Link href="/" className="text-secondary hover:text-foreground transition-colors"><ArrowLeft size={20} /></Link>
-            <Link href="/" className="text-xl font-extrabold tracking-tighter">ZENI.</Link>
+            <Link href="/" className="text-xl font-extrabold tracking-tighter flex items-baseline"><span className="font-light text-secondary">Next</span><span>Zeni</span></Link>
           </div>
           <div className="flex items-center gap-3 text-secondary">
             <button className="hover:text-foreground transition-colors"><Bookmark size={19} /></button>
@@ -218,7 +218,7 @@ export default function ArticlePage() {
           <div className="sticky top-24">
             {headings.length > 0 ? (
               <>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary mb-4">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-accent mb-4">
                   On this page
                 </p>
                 <nav className="space-y-0.5">
@@ -255,7 +255,7 @@ export default function ArticlePage() {
                 <div className="h-full bg-accent transition-all duration-150" style={{ width: `${speedProgress}%` }} />
               </div>
 
-              <p className="text-[10px] uppercase tracking-widest text-secondary/50 mb-8">
+              <p className="text-[10px] uppercase tracking-widest text-accent mb-8">
                 {speedWpm} WPM · {speedIdx} / {speedWords.length} words
               </p>
 
@@ -281,7 +281,7 @@ export default function ArticlePage() {
                     key={w}
                     onClick={() => doStart(w)}
                     className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      speedWpm === w ? "bg-foreground text-background" : "bg-secondary/8 text-secondary hover:bg-secondary/20"
+                      speedWpm === w ? "bg-button text-white" : "bg-secondary/8 text-secondary hover:bg-secondary/20"
                     }`}
                   >
                     {w}
@@ -337,7 +337,7 @@ export default function ArticlePage() {
                     {/* play/pause */}
                     <button
                       onClick={audioState === "playing" ? audioPause : audioPlay}
-                      className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center hover:bg-foreground/80 transition-colors flex-shrink-0"
+                      className="w-8 h-8 rounded-full bg-button text-white flex items-center justify-center hover:bg-button/80 transition-colors flex-shrink-0"
                     >
                       {audioState === "playing"
                         ? <Pause size={13} fill="currentColor" />
@@ -362,7 +362,7 @@ export default function ArticlePage() {
                           key={r}
                           onClick={() => changeRate(r)}
                           className={`text-[11px] px-1.5 py-0.5 rounded transition-colors font-medium ${
-                            audioRate === r ? "bg-foreground text-background" : "text-secondary hover:text-foreground"
+                            audioRate === r ? "bg-button text-white" : "text-secondary hover:text-foreground"
                           }`}
                         >
                           {r}×
@@ -379,7 +379,7 @@ export default function ArticlePage() {
                   {/* Voice selector */}
                   {voices.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-border">
-                      <p className="text-[10px] uppercase tracking-widest text-secondary/50 mb-2">Voice</p>
+                      <p className="text-[10px] uppercase tracking-widest text-accent mb-2">Voice</p>
                       <div className="flex flex-wrap gap-1.5">
                         {voices.slice(0, 8).map((v) => (
                           <button
@@ -394,7 +394,7 @@ export default function ArticlePage() {
                             title={`${v.name} (${v.lang})`}
                             className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors max-w-[120px] truncate ${
                               selectedVoice === v.name
-                                ? "bg-foreground text-background"
+                                ? "bg-button text-white"
                                 : "bg-secondary/8 text-secondary hover:bg-secondary/20"
                             }`}
                           >
@@ -504,9 +504,9 @@ export default function ArticlePage() {
                     {article.author[0]?.toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-xs text-secondary uppercase tracking-widest mb-1 font-medium">Written by</p>
+                    <p className="text-xs text-accent uppercase tracking-widest mb-1 font-medium">Written by</p>
                     <h4 className="font-bold text-lg mb-3">{article.author}</h4>
-                    <Link href="/write" className="inline-block bg-foreground text-background text-sm px-5 py-2 rounded-full hover:bg-foreground/90 transition-colors">
+                    <Link href="/write" className="inline-block bg-button text-white text-sm px-5 py-2 rounded-full hover:bg-button/90 transition-colors">
                       Write a story
                     </Link>
                   </div>
@@ -516,7 +516,7 @@ export default function ArticlePage() {
               {/* related */}
               {related.length > 0 && (
                 <div className="mt-14">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary mb-6">More stories</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-accent mb-6">More stories</p>
                   <div className="space-y-6">
                     {related.map((b) => (
                       <Link key={b.id} href={`/article/${b.id}`} className="block group">
@@ -585,7 +585,7 @@ export default function ArticlePage() {
                       key={w}
                       onClick={() => setSpeedWpm(w)}
                       className={`py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                        speedWpm === w ? "bg-foreground text-background" : "bg-secondary/8 text-secondary hover:bg-secondary/15"
+                        speedWpm === w ? "bg-button text-white" : "bg-secondary/8 text-secondary hover:bg-secondary/15"
                       }`}
                     >
                       {w}
@@ -595,7 +595,7 @@ export default function ArticlePage() {
 
                 <button
                   onClick={() => doStart(speedWpm)}
-                  className="w-full bg-foreground text-background text-sm font-medium py-2.5 rounded-full hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2"
+                  className="w-full bg-button text-white text-sm font-medium py-2.5 rounded-full hover:bg-button/90 transition-colors flex items-center justify-center gap-2"
                 >
                   <Play size={13} fill="currentColor" />
                   Start test

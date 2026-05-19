@@ -59,8 +59,8 @@ export default function Home() {
       {/* ── Header ── */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
         <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
-          <Link href="/" className="text-2xl font-extrabold tracking-tighter flex-shrink-0">
-            ZENI.
+          <Link href="/" className="text-2xl font-extrabold tracking-tighter flex-shrink-0 flex items-baseline gap-0">
+            <span className="font-light text-secondary">Next</span><span className="text-foreground">Zeni</span>
           </Link>
 
           <div className="hidden md:flex flex-1 max-w-sm">
@@ -77,6 +77,9 @@ export default function Home() {
           </div>
 
           <nav className="hidden md:flex items-center gap-5 text-sm font-medium">
+            <Link href="/tools" className="text-secondary hover:text-foreground transition-colors">
+              Tools
+            </Link>
             <Link
               href="/write"
               className="flex items-center gap-1.5 text-secondary hover:text-foreground transition-colors"
@@ -84,7 +87,7 @@ export default function Home() {
               <PenLine size={16} />
               Write
             </Link>
-            <button className="bg-foreground text-background px-5 py-2 rounded-full hover:bg-foreground/90 transition-colors">
+            <button className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors">
               Sign In
             </button>
           </nav>
@@ -105,7 +108,7 @@ export default function Home() {
               onClick={() => setActiveCategory(null)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
                 !activeCategory
-                  ? "bg-foreground text-background"
+                  ? "bg-button text-white"
                   : "bg-secondary/8 text-secondary hover:bg-secondary/15"
               }`}
             >
@@ -117,7 +120,7 @@ export default function Home() {
                 onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
                   activeCategory === cat
-                    ? "bg-foreground text-background"
+                    ? "bg-button text-white"
                     : "bg-secondary/8 text-secondary hover:bg-secondary/15"
                 }`}
               >
@@ -186,7 +189,7 @@ export default function Home() {
               {/* Category heading — only show when "All" or multiple categories */}
               {(!activeCategory || grouped.size > 1) && (
                 <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest text-secondary">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-accent">
                     {cat}
                   </h2>
                   {!activeCategory && (
@@ -270,7 +273,7 @@ export default function Home() {
               </p>
               <Link
                 href="/write"
-                className="flex items-center justify-center gap-2 w-full bg-foreground text-background text-sm font-medium py-2.5 rounded-full hover:bg-foreground/90 transition-colors"
+                className="flex items-center justify-center gap-2 w-full bg-button text-white text-sm font-medium py-2.5 rounded-full hover:bg-button/90 transition-colors"
               >
                 <PenLine size={14} />
                 New story
@@ -279,7 +282,7 @@ export default function Home() {
 
             {/* Topics */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-secondary mb-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-4">
                 Explore topics
               </p>
               <div className="flex flex-wrap gap-2">
@@ -289,7 +292,7 @@ export default function Home() {
                     onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
                     className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       activeCategory === cat
-                        ? "bg-foreground text-background"
+                        ? "bg-button text-white"
                         : "bg-secondary/8 text-foreground hover:bg-secondary/15"
                     }`}
                   >
@@ -306,7 +309,7 @@ export default function Home() {
                   <a key={l} href="#" className="hover:text-secondary transition-colors">{l}</a>
                 ))}
               </div>
-              <p>© 2026 ZENI.</p>
+              <p>© 2026 NextZeni</p>
             </div>
           </div>
         </aside>

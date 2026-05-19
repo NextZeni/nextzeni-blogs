@@ -1,11 +1,13 @@
 @import "tailwindcss";
 
+/* Color palette — keep in sync with src/lib/colors.ts */
 @theme {
   --color-background: #ffffff;
   --color-foreground: #242424;
-  --color-secondary: #6b6b6b;
-  --color-accent: #1a8917;
-  --color-border: #e6e6e6;
+  --color-secondary:  #6b6b6b;
+  --color-accent:     #2E6F40;
+  --color-button:     #2E6F40;
+  --color-border:     #e6e6e6;
   
   --font-sans: 'Inter', sans-serif;
   --font-serif: 'Source Serif 4', Georgia, serif;

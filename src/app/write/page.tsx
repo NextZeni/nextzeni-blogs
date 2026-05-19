@@ -63,7 +63,7 @@ export default function WritePage() {
             <Link href="/" className="text-secondary hover:text-foreground transition-colors">
               <X size={20} />
             </Link>
-            <Link href="/" className="text-xl font-extrabold tracking-tighter">ZENI.</Link>
+            <Link href="/" className="text-xl font-extrabold tracking-tighter flex items-baseline"><span className="font-light text-secondary">Next</span><span>Zeni</span></Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export default function WritePage() {
             <button
               onClick={handlePublish}
               disabled={publishing}
-              className="bg-accent text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-accent/90 transition-colors disabled:opacity-60"
+              className="bg-button text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-button/90 transition-colors disabled:opacity-60"
             >
               {publishing ? "Publishing..." : "Publish"}
             </button>
@@ -152,7 +152,7 @@ Use blank lines to separate paragraphs. Your story will be beautifully formatted
         {/* Heading hint */}
         {content.length === 0 && (
           <div className="mt-8 p-5 bg-secondary/4 rounded-xl border border-border">
-            <p className="text-xs font-semibold text-secondary uppercase tracking-widest mb-3">Formatting tips</p>
+            <p className="text-xs font-semibold text-accent uppercase tracking-widest mb-3">Formatting tips</p>
             <div className="space-y-2 text-sm text-secondary">
               <p><span className="font-mono bg-secondary/10 px-1.5 py-0.5 rounded text-foreground">## Heading</span> → Section heading (appears in Table of Contents)</p>
               <p><span className="font-mono bg-secondary/10 px-1.5 py-0.5 rounded text-foreground">### Sub-heading</span> → Sub-section heading</p>
