@@ -7,6 +7,7 @@ import {
   ChevronRight, UploadCloud, FileText, X, Loader2,
 } from "lucide-react";
 import { analyzeResume, type ResumeResult } from "@/lib/ats";
+import { useAuth } from "@/context/AuthContext";
 
 /* ─── File → plain text ─────────────────────────────────────────────────────── */
 
@@ -118,6 +119,7 @@ function DropZone({ file, onFile, onClear }: { file: File | null; onFile: (f: Fi
 /* ─── Page ──────────────────────────────────────────────────────────────────── */
 
 export default function ATSCheckerPage() {
+  const { user, logout } = useAuth();
   const [file,    setFile]    = useState<File | null>(null);
   const [result,  setResult]  = useState<ResumeResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -158,9 +160,29 @@ export default function ATSCheckerPage() {
             <Link href="/write" className="flex items-center gap-1.5 text-secondary hover:text-foreground transition-colors">
               <PenLine size={16} /> Write
             </Link>
-            <button className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors">
-              Sign In
-            </button>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href={user.role === "admin" ? "/admin/blogs" : "/dashboard"}
+                  className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors font-medium text-sm flex items-center justify-center"
+                >
+                  {user.firstName}
+                </Link>
+                <button
+                  onClick={() => logout()}
+                  className="text-secondary hover:text-red-500 font-medium text-sm transition-colors px-3 py-1.5 cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors font-medium text-sm flex items-center justify-center"
+              >
+                Sign In
+              </Link>
+            )}
           </nav>
         </div>
       </header>

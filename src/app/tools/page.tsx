@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { FileSearch, BookOpen, Gauge, AlignLeft, ArrowRight, PenLine, Wrench } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const tools = [
   {
@@ -33,6 +36,7 @@ const tools = [
 ];
 
 export default function ToolsPage() {
+  const { user, logout } = useAuth();
   return (
     <div className="min-h-screen">
       {/* ── Header ── */}
@@ -47,9 +51,29 @@ export default function ToolsPage() {
             <Link href="/write" className="flex items-center gap-1.5 text-secondary hover:text-foreground transition-colors">
               <PenLine size={16} /> Write
             </Link>
-            <button className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors">
-              Sign In
-            </button>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href={user.role === "admin" ? "/admin/blogs" : "/dashboard"}
+                  className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors font-medium text-sm flex items-center justify-center"
+                >
+                  {user.firstName}
+                </Link>
+                <button
+                  onClick={() => logout()}
+                  className="text-secondary hover:text-red-500 font-medium text-sm transition-colors px-3 py-1.5 cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors font-medium text-sm flex items-center justify-center"
+              >
+                Sign In
+              </Link>
+            )}
           </nav>
         </div>
       </header>

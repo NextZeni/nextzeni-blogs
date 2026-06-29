@@ -122,6 +122,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUsers(loadedUsers);
       localStorage.setItem(USERS_KEY, JSON.stringify(loadedUsers));
 
+      const passwords = JSON.parse(localStorage.getItem(PASSWORDS_KEY) ?? "{}") as Record<string, string>;
+      let passwordsChanged = false;
+      for (const seed of SEED_USERS) {
+        if (!passwords[seed.id]) {
+          passwords[seed.id] = "password123";
+          passwordsChanged = true;
+        }
+      }
+      if (passwordsChanged) {
+        localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords));
+      }
+
       const sessionId = localStorage.getItem(SESSION_KEY);
       if (sessionId === "admin-1") {
         setUser(ADMIN_USER);

@@ -31,7 +31,7 @@ const STATUS_CONFIG = {
 };
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { blogs, loading } = useBlogs();
 
   const myBlogs = useMemo(
@@ -52,9 +52,14 @@ export default function DashboardPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center max-w-sm px-6">
           <h2 className="text-2xl font-bold mb-3">Sign in to view dashboard</h2>
-          <Link href="/" className="bg-button text-white px-6 py-2.5 rounded-full text-sm font-medium">
-            Back to home
-          </Link>
+          <div className="flex justify-center gap-3">
+            <Link href="/auth/login" className="bg-button text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-button/90 transition-colors">
+              Sign In
+            </Link>
+            <Link href="/" className="btn-ghost px-6 py-2.5 rounded-full text-sm font-medium transition-colors">
+              Back to home
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -72,6 +77,12 @@ export default function DashboardPage() {
             <Link href="/write" className="flex items-center gap-2 bg-button text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-button/90 transition-colors">
               <PenLine size={14} /> New Story
             </Link>
+            <button
+              onClick={() => logout()}
+              className="text-secondary hover:text-red-500 font-medium text-sm transition-colors px-3 py-1.5 cursor-pointer"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </header>

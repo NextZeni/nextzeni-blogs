@@ -24,13 +24,13 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  .serif {
-    font-family: var(--font-serif);
-  }
-
   * {
     box-sizing: border-box;
   }
+}
+
+@utility serif {
+  font-family: var(--font-serif);
 }
 
 @layer components {

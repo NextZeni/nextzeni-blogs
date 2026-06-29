@@ -14,7 +14,7 @@ function formatNum(n: number) {
 
 export default function Home() {
   const { blogs } = useBlogs();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -110,9 +110,29 @@ export default function Home() {
                 Dashboard
               </Link>
             )}
-            <button className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors">
-              {user ? `${user.firstName}` : "Sign In"}
-            </button>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href={user.role === "admin" ? "/admin/blogs" : "/dashboard"}
+                  className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors font-medium text-sm flex items-center justify-center"
+                >
+                  {user.firstName}
+                </Link>
+                <button
+                  onClick={() => logout()}
+                  className="text-secondary hover:text-red-500 font-medium text-sm transition-colors px-3 py-1.5 cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors font-medium text-sm flex items-center justify-center"
+              >
+                Sign In
+              </Link>
+            )}
           </nav>
 
           <Link href="/write" className="md:hidden p-1 text-foreground">

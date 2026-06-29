@@ -93,9 +93,14 @@ export default function WritePage() {
         <div className="text-center max-w-sm px-6">
           <h2 className="text-2xl font-bold mb-3">Sign in to write</h2>
           <p className="text-secondary mb-6">You need an account to submit stories for review.</p>
-          <Link href="/" className="bg-button text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-button/90 transition-colors">
-            Back to home
-          </Link>
+          <div className="flex justify-center gap-3">
+            <Link href="/auth/login" className="bg-button text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-button/90 transition-colors">
+              Sign In
+            </Link>
+            <Link href="/" className="btn-ghost px-6 py-2.5 rounded-full text-sm font-medium transition-colors">
+              Back to home
+            </Link>
+          </div>
         </div>
       </div>
     );

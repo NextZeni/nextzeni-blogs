@@ -9,7 +9,7 @@ import { CheckCircle, XCircle, Eye, Clock, Hourglass, LayoutDashboard } from "lu
 type FilterTab = "pending" | "published" | "rejected" | "all";
 
 export default function AdminBlogsPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { blogs, loading, approveBlog, rejectBlog } = useBlogs();
 
   const [tab, setTab] = useState<FilterTab>("pending");
@@ -66,9 +66,17 @@ export default function AdminBlogsPage() {
           <Link href="/" className="text-xl font-extrabold tracking-tighter flex items-baseline">
             <span className="font-light text-secondary">Next</span><span>Zeni</span>
           </Link>
-          <div className="flex items-center gap-2 text-sm text-secondary">
-            <LayoutDashboard size={15} />
-            Admin Panel
+          <div className="flex items-center gap-4 text-sm text-secondary">
+            <span className="flex items-center gap-1.5">
+              <LayoutDashboard size={15} />
+              Admin Panel
+            </span>
+            <button
+              onClick={() => logout()}
+              className="text-secondary hover:text-red-500 font-medium text-sm transition-colors px-3 py-1.5 cursor-pointer"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </header>
