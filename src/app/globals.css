@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
-/* Color palette — keep in sync with src/lib/colors.ts */
 @theme {
   --color-background: #ffffff;
-  --color-foreground: #242424;
+  --color-foreground: #1a1a1a;
   --color-secondary:  #6b6b6b;
   --color-accent:     #2E6F40;
   --color-button:     #2E6F40;
-  --color-border:     #e6e6e6;
-  
-  --font-sans: 'Inter', sans-serif;
-  --font-serif: 'Source Serif 4', Georgia, serif;
-  
+  --color-border:     #e8e8e8;
+  --color-surface:    #f8f8f8;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+
   --max-width-article: 720px;
 }
 
@@ -27,6 +27,10 @@
   .serif {
     font-family: var(--font-serif);
   }
+
+  * {
+    box-sizing: border-box;
+  }
 }
 
 @layer components {
@@ -34,8 +38,105 @@
     max-width: var(--max-width-article);
     @apply mx-auto px-6 py-12;
   }
-  
+
   .link-hover {
     @apply transition-opacity duration-200 hover:opacity-70;
   }
+
+  .btn-primary {
+    @apply bg-button text-white px-5 py-2 rounded-full font-medium text-sm hover:bg-button/90 transition-colors;
+  }
+
+  .btn-ghost {
+    @apply text-secondary border border-border px-5 py-2 rounded-full text-sm hover:text-foreground hover:border-foreground/30 transition-colors;
+  }
+
+  .card {
+    @apply border border-border rounded-2xl bg-white;
+  }
+
+  .category-badge {
+    @apply text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide;
+  }
+
+  .inline-code {
+    @apply font-mono text-sm bg-secondary/10 text-foreground px-1.5 py-0.5 rounded;
+  }
+
+  /* Ticker animation */
+  @keyframes ticker {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .ticker-inner {
+    display: flex;
+    white-space: nowrap;
+    animation: ticker 30s linear infinite;
+  }
+
+  .ticker-inner:hover {
+    animation-play-state: paused;
+  }
+
+  /* Dashboard sidebar active state */
+  .nav-active {
+    @apply bg-accent/10 text-accent font-semibold;
+  }
+
+  /* Smooth page transitions */
+  .page-enter {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Article content formatting */
+  .prose-zeni h2 {
+    @apply serif text-2xl font-bold mt-10 mb-3 tracking-tight text-foreground;
+  }
+
+  .prose-zeni h3 {
+    @apply serif text-xl font-semibold mt-8 mb-2 tracking-tight text-foreground;
+  }
+
+  .prose-zeni p {
+    @apply text-lg leading-[1.85] font-light text-foreground mb-1;
+  }
+
+  .prose-zeni blockquote {
+    @apply border-l-4 border-accent/60 pl-5 italic text-secondary my-6;
+  }
+
+  .prose-zeni code {
+    @apply font-mono text-sm bg-gray-50 border border-border rounded-lg p-4 block overflow-x-auto my-4 text-foreground;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }

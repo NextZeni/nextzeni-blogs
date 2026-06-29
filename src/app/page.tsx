@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from "react";
 import { useBlogs } from "@/context/BlogContext";
+import { useAuth } from "@/context/AuthContext";
 import { CATEGORIES } from "@/data/dummy";
-import { Bookmark, Search, Heart, PenLine, ArrowRight } from "lucide-react";
+import { Bookmark, Search, Heart, PenLine, ArrowRight, LayoutDashboard, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 function formatNum(n: number) {
@@ -13,12 +14,14 @@ function formatNum(n: number) {
 
 export default function Home() {
   const { blogs } = useBlogs();
+  const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return blogs.filter((b) => {
+      if (b.status !== "published") return false;
       const matchCat = !activeCategory || b.category === activeCategory;
       const matchSearch =
         !q ||
@@ -45,7 +48,9 @@ export default function Home() {
     return map;
   }, [filtered]);
 
-  const usedCategories = CATEGORIES.filter((c) => blogs.some((b) => b.category === c));
+  const usedCategories = CATEGORIES.filter((c) =>
+    blogs.some((b) => b.category === c && b.status === "published")
+  );
 
   // Featured = most claps among all blogs
   const featured = useMemo(() =>
@@ -87,8 +92,26 @@ export default function Home() {
               <PenLine size={16} />
               Write
             </Link>
+            {user?.role === "admin" && (
+              <Link
+                href="/admin/blogs"
+                className="flex items-center gap-1.5 text-secondary hover:text-foreground transition-colors"
+              >
+                <ShieldCheck size={16} />
+                Review
+              </Link>
+            )}
+            {user && user.role !== "admin" && (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 text-secondary hover:text-foreground transition-colors"
+              >
+                <LayoutDashboard size={16} />
+                Dashboard
+              </Link>
+            )}
             <button className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors">
-              Sign In
+              {user ? `${user.firstName}` : "Sign In"}
             </button>
           </nav>
 
