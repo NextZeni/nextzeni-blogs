@@ -23,34 +23,39 @@ export default function ArticlePage() {
   const { id } = useParams<{ id: string }>();
   const {
     getBlog, deleteBlog, blogs, incrementViews,
-    incrementClaps, comments, addComment, deleteComment, likeComment
+    incrementClaps, decrementClaps, comments, addComment, deleteComment, likeComment
   } = useBlogs();
-  const { user, toggleSaveArticle } = useAuth();
+  const { user, toggleSaveArticle, toggleLikeArticle } = useAuth();
   const router = useRouter();
   const article = getBlog(id);
 
   useEffect(() => {
-    if (id) {
-      incrementViews(id).catch(console.error);
-    }
+    if (!id) return;
+    const sessionKey = `viewed_${id}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+
+    const timer = setTimeout(() => {
+      incrementViews(id)
+        .then(() => {
+          sessionStorage.setItem(sessionKey, "true");
+        })
+        .catch(console.error);
+    }, 10000);
+
+    return () => clearTimeout(timer);
   }, [id, incrementViews]);
 
   // — basic —
-  const [claps, setClaps] = useState(article?.claps ?? 0);
-  const [clapped, setClapped] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [activeHeading, setActiveHeading] = useState("");
+
+  const clapped = useMemo(() => {
+    return user?.likedArticles?.includes(id as string) ?? false;
+  }, [id, user?.likedArticles]);
 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [newCommentText, setNewCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
-
-  // Sync claps state when article loads
-  useEffect(() => {
-    if (article) {
-      setClaps(article.claps);
-    }
-  }, [article?.id, article?.claps]);
 
   const articleComments = useMemo(() => {
     return comments
@@ -209,10 +214,16 @@ export default function ArticlePage() {
   }
 
   function handleClap() {
-    if (!clapped && article) {
+    if (!article) return;
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
+    const isNowLiked = toggleLikeArticle(article.id);
+    if (isNowLiked) {
       incrementClaps(article.id).catch(console.error);
-      setClaps((c) => c + 1);
-      setClapped(true);
+    } else {
+      decrementClaps(article.id).catch(console.error);
     }
   }
 
@@ -387,7 +398,9 @@ export default function ArticlePage() {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-sm">{article.author}</p>
-                  <p className="text-xs text-secondary mt-0.5">{article.readingTime} · {article.date}</p>
+                  <p className="text-xs text-secondary mt-0.5">
+                    {article.readingTime} · {article.date} · {fmt(article.views ?? 0)} views
+                  </p>
                 </div>
                 <button
                   onClick={() => setAudioOpen((v) => !v)}
@@ -494,6 +507,16 @@ export default function ArticlePage() {
                 </div>
               )}
 
+              {article.coverImage && (
+                <div className="mt-6 rounded-2xl overflow-hidden aspect-video relative max-w-full bg-secondary/5 border border-border/40">
+                  <img
+                    src={article.coverImage}
+                    alt={article.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
               {/* reaction bar */}
               <div className="flex items-center gap-5 py-4 mb-10 border-b border-border text-secondary">
                 <button
@@ -501,7 +524,7 @@ export default function ArticlePage() {
                   className={`flex items-center gap-2 text-sm transition-colors ${clapped ? "text-accent" : "hover:text-foreground"}`}
                 >
                   <Heart size={18} fill={clapped ? "currentColor" : "none"} />
-                  <span>{fmt(claps)}</span>
+                  <span>{fmt(article?.claps ?? 0)}</span>
                 </button>
                 <button
                   onClick={() => setCommentsOpen(true)}
@@ -572,7 +595,7 @@ export default function ArticlePage() {
                   className={`flex items-center gap-2 text-sm transition-colors ${clapped ? "text-accent" : "hover:text-foreground"}`}
                 >
                   <Heart size={18} fill={clapped ? "currentColor" : "none"} />
-                  <span>{fmt(claps)}</span>
+                  <span>{fmt(article?.claps ?? 0)}</span>
                 </button>
                 <button
                   onClick={() => setCommentsOpen(true)}

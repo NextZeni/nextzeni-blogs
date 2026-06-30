@@ -14,6 +14,7 @@ export interface User {
   joinDate: string;
   isActive: boolean;
   savedArticles?: string[];
+  likedArticles?: string[];
 }
 
 export interface Article {

@@ -4,18 +4,35 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
-import { CheckCircle, XCircle, Eye, Clock, Hourglass, LayoutDashboard } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Clock, Hourglass, LayoutDashboard, Trash, Plus } from "lucide-react";
 
 type FilterTab = "pending" | "published" | "rejected" | "all";
 
 export default function AdminBlogsPage() {
   const { user, logout } = useAuth();
-  const { blogs, loading, approveBlog, rejectBlog } = useBlogs();
+  const { blogs, loading, approveBlog, rejectBlog, categories, addCategory, deleteCategory } = useBlogs();
 
   const [tab, setTab] = useState<FilterTab>("pending");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
+
+  const [newCatName, setNewCatName] = useState("");
+  const [addingCategory, setAddingCategory] = useState(false);
+
+  async function handleAddCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    setAddingCategory(true);
+    try {
+      await addCategory(newCatName.trim());
+      setNewCatName("");
+    } catch (err) {
+      console.error("Error adding category:", err);
+    } finally {
+      setAddingCategory(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     if (tab === "all") return blogs;
@@ -82,6 +99,9 @@ export default function AdminBlogsPage() {
       </header>
 
       <main className="max-w-[1100px] mx-auto px-6 pt-10 pb-24">
+        <div className="flex flex-col lg:flex-row gap-10 items-start">
+          {/* Main Area: Blog Review */}
+          <div className="flex-1 min-w-0 w-full">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">Blog Review</h1>
           <p className="text-secondary mt-1">Approve or reject user-submitted stories before they go public.</p>
@@ -184,6 +204,53 @@ export default function AdminBlogsPage() {
               </div>
             </div>
           ))}
+        </div>
+          </div>
+
+          {/* Sidebar Area: Categories Manager */}
+          <div className="w-full lg:w-[320px] flex-shrink-0 bg-white border border-border rounded-2xl p-6 shadow-sm">
+            <h2 className="text-lg font-bold mb-1">Categories</h2>
+            <p className="text-xs text-secondary mb-4">Add or remove story categories.</p>
+
+            {/* Add Category Form */}
+            <form onSubmit={handleAddCategory} className="flex gap-2 mb-5">
+              <input
+                type="text"
+                placeholder="New category..."
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                className="flex-1 text-sm px-3.5 py-2 border border-border rounded-full outline-none focus:ring-1 focus:ring-accent"
+              />
+              <button
+                type="submit"
+                disabled={addingCategory || !newCatName.trim()}
+                className="bg-button text-white text-xs font-semibold px-4 py-2 rounded-full hover:bg-button/90 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Add
+              </button>
+            </form>
+
+            {/* Categories list */}
+            <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+              {categories.length === 0 ? (
+                <p className="text-xs text-secondary italic">No categories created yet.</p>
+              ) : (
+                categories.map((cat) => (
+                  <div key={cat} className="flex items-center justify-between py-1.5 px-3 rounded-xl hover:bg-secondary/4 transition-colors">
+                    <span className="text-sm font-medium text-foreground">{cat}</span>
+                    <button
+                      type="button"
+                      onClick={() => deleteCategory(cat)}
+                      className="text-secondary hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                      title={`Delete ${cat}`}
+                    >
+                      <Trash size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </main>
 

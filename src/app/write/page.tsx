@@ -1,22 +1,29 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
-import { CATEGORIES, calcReadingTime } from "@/data/dummy";
+import { calcReadingTime } from "@/data/dummy";
 import { X, ImagePlus, Loader2, CheckCircle } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 
 export default function WritePage() {
-  const { addBlog } = useBlogs();
+  const { addBlog, categories } = useBlogs();
   const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [category, setCategory] = useState("");
+
+  // Set default category when categories list loads
+  useEffect(() => {
+    if (categories.length > 0 && !category) {
+      setCategory(categories[0]);
+    }
+  }, [categories, category]);
   const [content, setContent] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -178,7 +185,7 @@ export default function WritePage() {
             onChange={(e) => setCategory(e.target.value)}
             className="ml-auto text-sm text-secondary bg-secondary/8 rounded-full px-4 py-2 outline-none border-0 cursor-pointer"
           >
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>

@@ -21,14 +21,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    // Add a tiny delay to simulate a premium loading experience
-    setTimeout(() => {
-      const res = login(email, password);
+    try {
+      const res = await login(email, password);
       setLoading(false);
 
       if (res.success) {
@@ -44,7 +43,10 @@ export default function LoginPage() {
       } else {
         setError(res.error ?? "Failed to sign in. Please try again.");
       }
-    }, 600);
+    } catch (err) {
+      setLoading(false);
+      setError("An error occurred. Please try again.");
+    }
   }
 
   function handleAutoFill(demoEmail: string, demoPass: string) {

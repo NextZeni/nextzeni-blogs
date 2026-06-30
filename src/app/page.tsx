@@ -3,9 +3,9 @@
 import { useState, useMemo } from "react";
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
-import { CATEGORIES } from "@/data/dummy";
-import { Bookmark, Search, Heart, PenLine, ArrowRight, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { Bookmark, Search, Heart, PenLine, ArrowRight, LayoutDashboard, ShieldCheck, Eye } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 function formatNum(n: number) {
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K";
@@ -13,8 +13,22 @@ function formatNum(n: number) {
 }
 
 export default function Home() {
-  const { blogs } = useBlogs();
-  const { user, logout, toggleSaveArticle } = useAuth();
+  const { blogs, categories, incrementClaps, decrementClaps } = useBlogs();
+  const { user, logout, toggleSaveArticle, toggleLikeArticle } = useAuth();
+  const router = useRouter();
+
+  function handleLikeArticle(articleId: string) {
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
+    const isNowLiked = toggleLikeArticle(articleId);
+    if (isNowLiked) {
+      incrementClaps(articleId).catch(console.error);
+    } else {
+      decrementClaps(articleId).catch(console.error);
+    }
+  }
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -32,25 +46,27 @@ export default function Home() {
     });
   }, [blogs, activeCategory, search]);
 
-  // Group filtered articles by category (preserve CATEGORIES order)
+  // Group filtered articles by category (preserve categories order)
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>();
-    for (const cat of CATEGORIES) {
+    for (const cat of categories) {
       const articles = filtered.filter((b) => b.category === cat);
       if (articles.length) map.set(cat, articles);
     }
-    // catch any category not in CATEGORIES list
+    // catch any category not in categories list
     for (const b of filtered) {
-      if (!CATEGORIES.includes(b.category) && !map.has(b.category)) {
+      if (!categories.includes(b.category) && !map.has(b.category)) {
         map.set(b.category, filtered.filter((x) => x.category === b.category));
       }
     }
     return map;
-  }, [filtered]);
+  }, [filtered, categories]);
 
-  const usedCategories = CATEGORIES.filter((c) =>
-    blogs.some((b) => b.category === c && b.status === "published")
-  );
+  const usedCategories = useMemo(() => {
+    return categories.filter((c) =>
+      blogs.some((b) => b.category === c && b.status === "published")
+    );
+  }, [categories, blogs]);
 
   // Featured = most claps among all blogs
   const featured = useMemo(() =>
@@ -212,11 +228,27 @@ export default function Home() {
                       {featured.category}
                     </span>
                     <span className="text-xs text-secondary">{featured.readingTime}</span>
-                    {featured.claps > 0 && (
-                      <span className="flex items-center gap-1 text-xs text-secondary">
-                        <Heart size={12} /> {formatNum(featured.claps)}
-                      </span>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleLikeArticle(featured.id);
+                      }}
+                      className={`flex items-center gap-1 text-xs transition-colors cursor-pointer ${
+                        user?.likedArticles?.includes(featured.id)
+                          ? "text-accent font-semibold"
+                          : "text-secondary hover:text-foreground"
+                      }`}
+                      title={user ? (user.likedArticles?.includes(featured.id) ? "Unlike this story" : "Like this story") : "Sign in to like"}
+                    >
+                      <Heart
+                        size={12}
+                        fill={user?.likedArticles?.includes(featured.id) ? "currentColor" : "none"}
+                      />{" "}
+                      {formatNum(featured.claps)}
+                    </button>
+                    <span className="flex items-center gap-1 text-xs text-secondary/70">
+                      <Eye size={12} /> {formatNum(featured.views ?? 0)}
+                    </span>
                   </div>
                   <span className="text-sm text-accent font-medium flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
                     Read <ArrowRight size={14} />
@@ -275,11 +307,27 @@ export default function Home() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-secondary">{article.readingTime}</span>
-                            {article.claps > 0 && (
-                              <span className="flex items-center gap-1 text-xs text-secondary">
-                                <Heart size={11} /> {formatNum(article.claps)}
-                              </span>
-                            )}
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleLikeArticle(article.id);
+                              }}
+                              className={`flex items-center gap-1 text-xs transition-colors cursor-pointer ${
+                                user?.likedArticles?.includes(article.id)
+                                  ? "text-accent font-semibold"
+                                  : "text-secondary hover:text-foreground"
+                              }`}
+                              title={user ? (user.likedArticles?.includes(article.id) ? "Unlike this story" : "Like this story") : "Sign in to like"}
+                            >
+                              <Heart
+                                size={11}
+                                fill={user?.likedArticles?.includes(article.id) ? "currentColor" : "none"}
+                              />{" "}
+                              {formatNum(article.claps)}
+                            </button>
+                            <span className="flex items-center gap-1 text-xs text-secondary/70">
+                              <Eye size={11} /> {formatNum(article.views ?? 0)}
+                            </span>
                           </div>
                           <button
                             onClick={() => toggleSaveArticle(article.id)}
@@ -302,11 +350,19 @@ export default function Home() {
                       {/* Thumbnail */}
                       <Link
                         href={`/article/${article.id}`}
-                        className="hidden sm:flex w-20 h-14 flex-shrink-0 rounded-lg bg-secondary/6 hover:bg-secondary/12 transition-colors items-center justify-center"
+                        className="hidden sm:flex w-20 h-14 flex-shrink-0 rounded-lg bg-secondary/6 hover:bg-secondary/12 transition-colors items-center justify-center overflow-hidden"
                       >
-                        <span className="serif text-3xl font-bold text-secondary/15 select-none">
-                          {article.title[0]}
-                        </span>
+                        {article.coverImage ? (
+                          <img
+                            src={article.coverImage}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="serif text-3xl font-bold text-secondary/15 select-none">
+                            {article.title[0]}
+                          </span>
+                        )}
                       </Link>
                     </div>
                   </article>

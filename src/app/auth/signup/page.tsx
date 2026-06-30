@@ -18,13 +18,13 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    setTimeout(() => {
-      const res = signup({
+    try {
+      const res = await signup({
         firstName,
         lastName,
         email,
@@ -42,7 +42,10 @@ export default function SignupPage() {
       } else {
         setError(res.error ?? "Failed to create account. Please try again.");
       }
-    }, 600);
+    } catch (err) {
+      setLoading(false);
+      setError("An error occurred. Please try again.");
+    }
   }
 
   return (

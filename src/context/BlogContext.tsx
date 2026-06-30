@@ -12,12 +12,14 @@ import { seedArticles } from "@/data/seeds";
 interface BlogContextValue {
   blogs: Article[];
   comments: Comment[];
+  categories: string[];
   loading: boolean;
   addBlog: (blog: Omit<Article, "id">) => Promise<string>;
   deleteBlog: (id: string) => Promise<void>;
   getBlog: (id: string) => Article | undefined;
   incrementViews: (id: string) => Promise<void>;
   incrementClaps: (id: string) => Promise<void>;
+  decrementClaps: (id: string) => Promise<void>;
   updateBlog: (id: string, updates: Partial<Article>) => Promise<void>;
   approveBlog: (id: string) => Promise<void>;
   rejectBlog: (id: string, reason: string) => Promise<void>;
@@ -25,37 +27,66 @@ interface BlogContextValue {
   deleteComment: (commentId: string, articleId: string) => Promise<void>;
   getComments: (articleId: string) => Comment[];
   likeComment: (commentId: string) => Promise<void>;
+  addCategory: (name: string) => Promise<void>;
+  deleteCategory: (name: string) => Promise<void>;
 }
 
 const BlogContext = createContext<BlogContextValue | null>(null);
 
 const ARTICLES_COL = "articles";
 const COMMENTS_COL = "comments";
+const CATEGORIES_COL = "categories";
 const META_DOC = "meta/seed";
 
 export function BlogProvider({ children }: { children: React.ReactNode }) {
   const [blogs, setBlogs] = useState<Article[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Seed articles into Firestore once
+  // Seed articles and categories into Firestore once
   useEffect(() => {
     async function seedIfNeeded() {
       try {
         const metaRef = doc(db, META_DOC);
         const metaSnap = await getDoc(metaRef);
-        if (!metaSnap.exists() || metaSnap.data()?.version !== "v3") {
+        if (!metaSnap.exists() || metaSnap.data()?.version !== "v4") {
+          // seed articles
           const writes = seedArticles.map((a) =>
             setDoc(doc(db, ARTICLES_COL, a.id), a)
           );
           await Promise.all(writes);
-          await setDoc(metaRef, { seeded: true, version: "v3" });
+
+          // Seed default categories
+          const defaultCats = [
+            "Technology", "Artificial Intelligence", "Design", "Engineering",
+            "Finance", "Productivity", "Science", "Health", "Culture",
+            "Writing", "Business"
+          ];
+          const catWrites = defaultCats.map((catName) => {
+            const docId = catName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            return setDoc(doc(db, CATEGORIES_COL, docId), { name: catName });
+          });
+          await Promise.all(catWrites);
+
+          await setDoc(metaRef, { seeded: true, version: "v4" });
         }
       } catch (err) {
         console.error("Seed error:", err);
       }
     }
     seedIfNeeded();
+  }, []);
+
+  // Real-time listener for categories
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, CATEGORIES_COL), (snap) => {
+      let items = snap.docs.map((d) => d.data().name as string);
+      // Sort alphabetically
+      items.sort();
+      setCategories(items);
+    });
+    return unsub;
   }, []);
 
   // Real-time listener for articles
@@ -98,6 +129,10 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     await updateDoc(doc(db, ARTICLES_COL, id), { claps: increment(1) });
   }, []);
 
+  const decrementClaps = useCallback(async (id: string) => {
+    await updateDoc(doc(db, ARTICLES_COL, id), { claps: increment(-1) });
+  }, []);
+
   async function updateBlog(id: string, updates: Partial<Article>) {
     await updateDoc(doc(db, ARTICLES_COL, id), updates);
   }
@@ -128,17 +163,31 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     await updateDoc(doc(db, COMMENTS_COL, commentId), { likes: increment(1) });
   }
 
+  const addCategory = useCallback(async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const docId = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await setDoc(doc(db, CATEGORIES_COL, docId), { name: trimmed });
+  }, []);
+
+  const deleteCategory = useCallback(async (name: string) => {
+    const docId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await deleteDoc(doc(db, CATEGORIES_COL, docId));
+  }, []);
+
   return (
     <BlogContext.Provider
       value={{
         blogs,
         comments,
+        categories,
         loading,
         addBlog,
         deleteBlog,
         getBlog,
         incrementViews,
         incrementClaps,
+        decrementClaps,
         updateBlog,
         approveBlog,
         rejectBlog,
@@ -146,6 +195,8 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
         deleteComment,
         getComments,
         likeComment,
+        addCategory,
+        deleteCategory,
       }}
     >
       {children}
