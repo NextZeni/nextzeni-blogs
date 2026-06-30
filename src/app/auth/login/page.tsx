@@ -166,7 +166,7 @@ export default function LoginPage() {
         </div>
 
         {/* Demo Accounts Panel */}
-        {!success && (
+        {/* {!success && (
           <div className="mt-6 bg-white border border-border rounded-2xl p-5 shadow-sm">
             <h4 className="text-xs font-bold uppercase tracking-wider text-secondary mb-3">
               Demo Accounts (Click to Auto-fill)
@@ -192,7 +192,7 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );

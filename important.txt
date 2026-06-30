@@ -1,0 +1,11 @@
+Admin
+admin@nextzeni.com
+admin123
+
+Writer (Shreyas)
+shreyas@example.com
+password123
+
+Writer (Priya)
+priya@example.com
+password123
