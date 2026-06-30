@@ -6,9 +6,11 @@ import { parseContent } from "@/data/dummy";
 import {
   ArrowLeft, Bookmark, Heart, MessageCircle, Share2, Trash2,
   Volume2, Play, Pause, Square, ChevronUp, ChevronDown, Gauge,
+  Send, ThumbsUp, Trash, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 function fmt(n: number) {
   return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(n);
@@ -19,15 +21,46 @@ function fmtTime(s: number) {
 
 export default function ArticlePage() {
   const { id } = useParams<{ id: string }>();
-  const { getBlog, deleteBlog, blogs } = useBlogs();
+  const {
+    getBlog, deleteBlog, blogs, incrementViews,
+    incrementClaps, comments, addComment, deleteComment, likeComment
+  } = useBlogs();
+  const { user, toggleSaveArticle } = useAuth();
   const router = useRouter();
   const article = getBlog(id);
+
+  useEffect(() => {
+    if (id) {
+      incrementViews(id).catch(console.error);
+    }
+  }, [id, incrementViews]);
 
   // — basic —
   const [claps, setClaps] = useState(article?.claps ?? 0);
   const [clapped, setClapped] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [activeHeading, setActiveHeading] = useState("");
+
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [newCommentText, setNewCommentText] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  // Sync claps state when article loads
+  useEffect(() => {
+    if (article) {
+      setClaps(article.claps);
+    }
+  }, [article?.id, article?.claps]);
+
+  const articleComments = useMemo(() => {
+    return comments
+      .filter((c) => c.articleId === id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [id, comments]);
+
+  const isSaved = useMemo(() => {
+    return user?.savedArticles?.includes(id as string) ?? false;
+  }, [id, user?.savedArticles]);
 
   // — audio —
   const [audioOpen, setAudioOpen] = useState(false);
@@ -175,7 +208,35 @@ export default function ArticlePage() {
     setElapsed(0);
   }
 
-  function handleClap() { if (!clapped) { setClaps((c) => c + 1); setClapped(true); } }
+  function handleClap() {
+    if (!clapped && article) {
+      incrementClaps(article.id).catch(console.error);
+      setClaps((c) => c + 1);
+      setClapped(true);
+    }
+  }
+
+  async function handleSubmitComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !newCommentText.trim() || !article) return;
+    
+    setSubmittingComment(true);
+    try {
+      await addComment({
+        articleId: article.id,
+        authorId: user.id,
+        authorName: `${user.firstName} ${user.lastName}`,
+        content: newCommentText.trim(),
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        likes: 0,
+      });
+      setNewCommentText("");
+    } catch (err) {
+      console.error("Error adding comment:", err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  }
   function handleDelete() { deleteBlog(article!.id); router.push("/"); }
   function scrollTo(hId: string) { document.getElementById(hId)?.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
@@ -192,9 +253,18 @@ export default function ArticlePage() {
             <Link href="/" className="text-secondary hover:text-foreground transition-colors"><ArrowLeft size={20} /></Link>
             <Link href="/" className="text-xl font-extrabold tracking-tighter flex items-baseline"><span className="font-light text-secondary">Next</span><span>Zeni</span></Link>
           </div>
-          <div className="flex items-center gap-3 text-secondary">
-            <button className="hover:text-foreground transition-colors"><Bookmark size={19} /></button>
-            <button className="hover:text-foreground transition-colors"><Share2 size={19} /></button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { if (article) toggleSaveArticle(article.id); }}
+              disabled={!user}
+              className={`transition-colors cursor-pointer ${isSaved ? "text-accent" : "text-secondary hover:text-foreground"}`}
+              title={user ? (isSaved ? "Remove bookmark" : "Bookmark this story") : "Sign in to bookmark"}
+            >
+              <Bookmark size={19} fill={isSaved ? "currentColor" : "none"} />
+            </button>
+            <button className="hover:text-foreground transition-colors text-secondary cursor-pointer">
+              <Share2 size={19} />
+            </button>
             {confirmDelete ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs">Delete?</span>
@@ -433,12 +503,24 @@ export default function ArticlePage() {
                   <Heart size={18} fill={clapped ? "currentColor" : "none"} />
                   <span>{fmt(claps)}</span>
                 </button>
-                <button className="flex items-center gap-2 hover:text-foreground transition-colors text-sm">
-                  <MessageCircle size={18} /><span>{article.responses}</span>
+                <button
+                  onClick={() => setCommentsOpen(true)}
+                  className="flex items-center gap-2 hover:text-foreground transition-colors text-sm cursor-pointer"
+                >
+                  <MessageCircle size={18} /><span>{articleComments.length}</span>
                 </button>
                 <div className="flex-1" />
-                <button className="hover:text-foreground transition-colors"><Bookmark size={18} /></button>
-                <button className="hover:text-foreground transition-colors"><Share2 size={18} /></button>
+                <button
+                  onClick={() => { if (article) toggleSaveArticle(article.id); }}
+                  disabled={!user}
+                  className={`transition-colors cursor-pointer ${isSaved ? "text-accent" : "text-secondary hover:text-foreground"}`}
+                  title={user ? (isSaved ? "Remove bookmark" : "Bookmark this story") : "Sign in to bookmark"}
+                >
+                  <Bookmark size={18} fill={isSaved ? "currentColor" : "none"} />
+                </button>
+                <button className="hover:text-foreground transition-colors text-secondary cursor-pointer">
+                  <Share2 size={18} />
+                </button>
               </div>
 
               {/* ── Content with audio highlighting ── */}
@@ -492,8 +574,11 @@ export default function ArticlePage() {
                   <Heart size={18} fill={clapped ? "currentColor" : "none"} />
                   <span>{fmt(claps)}</span>
                 </button>
-                <button className="flex items-center gap-2 hover:text-foreground transition-colors text-sm">
-                  <MessageCircle size={18} /><span>{article.responses} responses</span>
+                <button
+                  onClick={() => setCommentsOpen(true)}
+                  className="flex items-center gap-2 hover:text-foreground transition-colors text-sm cursor-pointer"
+                >
+                  <MessageCircle size={18} /><span>{articleComments.length} responses</span>
                 </button>
               </div>
 
@@ -659,6 +744,135 @@ export default function ArticlePage() {
           </div>
         </aside>
       </div>
+
+      {/* ── Comments/Responses Drawer ── */}
+      {commentsOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden font-sans">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-xs transition-opacity animate-fade-in"
+            onClick={() => setCommentsOpen(false)}
+          />
+
+          <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+            <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col h-full border-l border-border relative animate-slide-in-right">
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-border flex items-center justify-between">
+                <h2 className="text-lg font-bold text-foreground">
+                  Responses ({articleComments.length})
+                </h2>
+                <button
+                  onClick={() => setCommentsOpen(false)}
+                  className="p-2 text-secondary hover:text-foreground hover:bg-surface rounded-full transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Comment input & list */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Form to add response */}
+                {user ? (
+                  <form onSubmit={handleSubmitComment} className="space-y-3">
+                    <div className="card p-4 border border-border bg-surface focus-within:ring-1 focus-within:ring-accent focus-within:border-accent transition-shadow">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[10px] font-bold text-accent">
+                          {user.firstName[0]}
+                        </div>
+                        <span className="text-xs font-semibold">{user.firstName} {user.lastName}</span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={newCommentText}
+                        onChange={(e) => setNewCommentText(e.target.value)}
+                        placeholder="What are your thoughts?"
+                        className="w-full text-sm bg-transparent border-0 outline-none resize-none placeholder:text-secondary/40 text-foreground"
+                        required
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={submittingComment || !newCommentText.trim()}
+                        className="btn-primary flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {submittingComment ? "Responding..." : "Respond"}
+                        <Send size={12} />
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="card p-5 border border-border text-center bg-surface">
+                    <p className="text-sm text-secondary mb-3">Sign in to share your thoughts on this story.</p>
+                    <Link
+                      href="/auth/login"
+                      className="inline-block bg-button text-white text-xs font-semibold px-4 py-2 rounded-full hover:bg-button/90 transition-colors"
+                    >
+                      Sign In to Respond
+                    </Link>
+                  </div>
+                )}
+
+                {/* Responses List */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  {articleComments.length === 0 ? (
+                    <p className="text-sm text-secondary text-center py-6">
+                      No responses yet. Be the first to share your thoughts!
+                    </p>
+                  ) : (
+                    articleComments.map((comment) => (
+                      <div key={comment.id} className="p-4 border border-border/60 rounded-2xl bg-white shadow-xs space-y-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-xs font-bold text-accent flex-shrink-0">
+                              {comment.authorName[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <span className="block text-xs font-semibold text-foreground leading-tight">
+                                {comment.authorName}
+                              </span>
+                              <span className="block text-[10px] text-secondary mt-0.5">
+                                {comment.date}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Delete option if author or admin */}
+                          {(user?.id === comment.authorId || user?.role === "admin") && (
+                            <button
+                              type="button"
+                              onClick={() => deleteComment(comment.id, article.id)}
+                              className="text-secondary hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Delete comment"
+                            >
+                              <Trash size={13} />
+                            </button>
+                          )}
+                        </div>
+
+                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap pl-0.5">
+                          {comment.content}
+                        </p>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => likeComment(comment.id)}
+                            className="flex items-center gap-1.5 text-xs text-secondary hover:text-accent transition-colors p-1 rounded hover:bg-surface cursor-pointer"
+                          >
+                            <ThumbsUp size={12} />
+                            <span>{comment.likes}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

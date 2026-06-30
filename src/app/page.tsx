@@ -14,7 +14,7 @@ function formatNum(n: number) {
 
 export default function Home() {
   const { blogs } = useBlogs();
-  const { user, logout } = useAuth();
+  const { user, logout, toggleSaveArticle } = useAuth();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -281,8 +281,20 @@ export default function Home() {
                               </span>
                             )}
                           </div>
-                          <button className="text-secondary hover:text-foreground transition-colors opacity-0 group-hover:opacity-100">
-                            <Bookmark size={16} />
+                          <button
+                            onClick={() => toggleSaveArticle(article.id)}
+                            disabled={!user}
+                            className={`transition-colors opacity-0 group-hover:opacity-100 cursor-pointer ${
+                              user?.savedArticles?.includes(article.id)
+                                ? "text-accent"
+                                : "text-secondary hover:text-foreground"
+                            }`}
+                            title={user ? (user.savedArticles?.includes(article.id) ? "Remove bookmark" : "Bookmark this story") : "Sign in to bookmark"}
+                          >
+                            <Bookmark
+                              size={16}
+                              fill={user?.savedArticles?.includes(article.id) ? "currentColor" : "none"}
+                            />
                           </button>
                         </div>
                       </div>

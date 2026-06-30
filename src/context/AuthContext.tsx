@@ -23,6 +23,7 @@ interface AuthContextValue {
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   toggleUserActive: (userId: string) => void;
+  toggleSaveArticle: (articleId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -216,10 +217,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     saveUsers(updatedUsers);
   }
 
+  function toggleSaveArticle(articleId: string) {
+    if (!user) return;
+    const saved = user.savedArticles || [];
+    const updatedSaved = saved.includes(articleId)
+      ? saved.filter((id) => id !== articleId)
+      : [...saved, articleId];
+    updateUser({ savedArticles: updatedSaved });
+  }
+
   if (!ready) return null;
 
   return (
-    <AuthContext.Provider value={{ user, users, login, signup, logout, updateUser, toggleUserActive }}>
+    <AuthContext.Provider value={{ user, users, login, signup, logout, updateUser, toggleUserActive, toggleSaveArticle }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
   setDoc, getDoc, increment, query, orderBy,
@@ -17,6 +17,7 @@ interface BlogContextValue {
   deleteBlog: (id: string) => Promise<void>;
   getBlog: (id: string) => Article | undefined;
   incrementViews: (id: string) => Promise<void>;
+  incrementClaps: (id: string) => Promise<void>;
   updateBlog: (id: string, updates: Partial<Article>) => Promise<void>;
   approveBlog: (id: string) => Promise<void>;
   rejectBlog: (id: string, reason: string) => Promise<void>;
@@ -43,12 +44,12 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       try {
         const metaRef = doc(db, META_DOC);
         const metaSnap = await getDoc(metaRef);
-        if (!metaSnap.exists()) {
+        if (!metaSnap.exists() || metaSnap.data()?.version !== "v3") {
           const writes = seedArticles.map((a) =>
             setDoc(doc(db, ARTICLES_COL, a.id), a)
           );
           await Promise.all(writes);
-          await setDoc(metaRef, { seeded: true, version: "v2" });
+          await setDoc(metaRef, { seeded: true, version: "v3" });
         }
       } catch (err) {
         console.error("Seed error:", err);
@@ -89,9 +90,13 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
     return blogs.find((b) => b.id === id);
   }
 
-  async function incrementViews(id: string) {
+  const incrementViews = useCallback(async (id: string) => {
     await updateDoc(doc(db, ARTICLES_COL, id), { views: increment(1) });
-  }
+  }, []);
+
+  const incrementClaps = useCallback(async (id: string) => {
+    await updateDoc(doc(db, ARTICLES_COL, id), { claps: increment(1) });
+  }, []);
 
   async function updateBlog(id: string, updates: Partial<Article>) {
     await updateDoc(doc(db, ARTICLES_COL, id), updates);
@@ -133,6 +138,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
         deleteBlog,
         getBlog,
         incrementViews,
+        incrementClaps,
         updateBlog,
         approveBlog,
         rejectBlog,

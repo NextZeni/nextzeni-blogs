@@ -13,6 +13,7 @@ export interface User {
   following: number;
   joinDate: string;
   isActive: boolean;
+  savedArticles?: string[];
 }
 
 export interface Article {
