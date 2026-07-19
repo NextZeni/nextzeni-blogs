@@ -123,10 +123,15 @@ export const CATEGORY_GRADIENT: Record<string, string> = {
 };
 
 export interface ContentBlock {
-  type: "h2" | "h3" | "paragraph" | "quote" | "code";
+  type: "h2" | "h3" | "paragraph" | "quote" | "code" | "image";
   text: string;
   id: string;
+  src?: string;
+  alt?: string;
 }
+
+// A markdown line that is exactly an image: ![alt](url)
+const IMAGE_LINE = /^!\[([^\]]*)\]\(([^)]+)\)$/;
 
 export function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-");
@@ -168,6 +173,10 @@ export function parseContent(raw: string): ContentBlock[] {
     } else if (line.startsWith("> ")) {
       flushPara();
       blocks.push({ type: "quote", text: line.slice(2).trim(), id: "" });
+    } else if (IMAGE_LINE.test(line.trim())) {
+      flushPara();
+      const [, alt, src] = line.trim().match(IMAGE_LINE)!;
+      blocks.push({ type: "image", text: alt, id: "", src, alt });
     } else if (line.trim() === "") {
       flushPara();
     } else {
@@ -178,11 +187,128 @@ export function parseContent(raw: string): ContentBlock[] {
   return blocks;
 }
 
+// Only allow safe link protocols — blocks javascript:, data:, etc.
+function safeHref(url: string): string | null {
+  const u = url.trim();
+  if (/^(https?:|mailto:)/i.test(u)) return u;
+  if (u.startsWith("/") || u.startsWith("#")) return u;
+  return null;
+}
+
 export function renderInline(text: string): string {
+  // Escape HTML first (content is used with dangerouslySetInnerHTML), then
+  // apply the inline markdown tokens. Escaping doesn't touch * ` [ ] ( ) so the
+  // token replacements below are unaffected.
   return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, '<code class="inline-code">$1</code>');
+    .replace(/`(.+?)`/g, '<code class="inline-code">$1</code>')
+    // Links: [text](url) — the (?<!!) skips image syntax ![alt](url).
+    .replace(/(?<!!)\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, url) => {
+      const href = safeHref(url);
+      if (!href) return label; // drop unsafe links, keep the text
+      return `<a href="${href.replace(/"/g, "&quot;")}" target="_blank" rel="noopener noreferrer nofollow" class="story-link">${label}</a>`;
+    });
+}
+
+/* ── Tiptap ⇆ markdown bridge ────────────────────────────────────────────
+   The editor is WYSIWYG but we keep storing the same markdown that
+   parseContent() reads, so the reader (ToC / audio / speed-reader) and all
+   existing articles are untouched. These are pure functions — no Tiptap
+   import — so they're framework-agnostic and easy to test.                  */
+
+export interface TiptapMark { type: string; attrs?: { href?: string } }
+export interface TiptapNode {
+  type: string;
+  text?: string;
+  attrs?: { level?: number; src?: string; alt?: string };
+  marks?: TiptapMark[];
+  content?: TiptapNode[];
+}
+export interface TiptapDoc { type: "doc"; content?: TiptapNode[] }
+
+// Inline nodes → markdown (`code`, **bold**, *italic*, [link](url)).
+function serializeInline(nodes?: TiptapNode[]): string {
+  return (nodes ?? [])
+    .map((n) => {
+      if (n.type === "hardBreak") return "\n";
+      let t = n.text ?? "";
+      const marks = n.marks ?? [];
+      const has = (type: string) => marks.some((m) => m.type === type);
+      if (has("code")) t = "`" + t + "`";
+      if (has("bold")) t = "**" + t + "**";
+      if (has("italic")) t = "*" + t + "*";
+      const link = marks.find((m) => m.type === "link");
+      if (link?.attrs?.href) t = "[" + t + "](" + link.attrs.href + ")"; // link wraps outermost
+      return t;
+    })
+    .join("");
+}
+
+// Editor JSON (editor.getJSON()) → the markdown format parseContent() expects.
+export function serializeToMarkdown(doc: TiptapDoc): string {
+  const out: string[] = [];
+  for (const node of doc.content ?? []) {
+    switch (node.type) {
+      case "heading":
+        out.push((node.attrs?.level === 3 ? "### " : "## ") + serializeInline(node.content));
+        break;
+      case "blockquote":
+        out.push((node.content ?? []).map((p) => "> " + serializeInline(p.content)).join("\n"));
+        break;
+      case "codeBlock":
+        out.push("```\n" + serializeInline(node.content) + "\n```");
+        break;
+      case "image":
+        out.push("![" + (node.attrs?.alt ?? "") + "](" + (node.attrs?.src ?? "") + ")");
+        break;
+      default: // paragraph & anything else
+        out.push(serializeInline(node.content));
+    }
+  }
+  return out.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Split a markdown string into inline text nodes with marks.
+function parseInline(text: string): TiptapNode[] {
+  const nodes: TiptapNode[] = [];
+  const regex = /(\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`|(?<!!)\[([^\]]+)\]\(([^)]+)\))/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  const push = (t: string, mark?: string) => {
+    if (!t) return;
+    nodes.push(mark ? { type: "text", text: t, marks: [{ type: mark }] } : { type: "text", text: t });
+  };
+  while ((m = regex.exec(text))) {
+    push(text.slice(last, m.index));
+    if (m[2] !== undefined) push(m[2], "bold");
+    else if (m[3] !== undefined) push(m[3], "italic");
+    else if (m[4] !== undefined) push(m[4], "code");
+    else if (m[5] !== undefined) nodes.push({ type: "text", text: m[5], marks: [{ type: "link", attrs: { href: m[6] } }] });
+    last = m.index + m[0].length;
+  }
+  push(text.slice(last));
+  return nodes;
+}
+
+// Stored markdown → editor JSON (reuses parseContent so it stays in lockstep
+// with the reader). Lets a future edit flow load an existing article.
+export function markdownToDoc(raw: string): TiptapDoc {
+  const content: TiptapNode[] = parseContent(raw).map((b) => {
+    if (b.type === "h2") return { type: "heading", attrs: { level: 2 }, content: parseInline(b.text) };
+    if (b.type === "h3") return { type: "heading", attrs: { level: 3 }, content: parseInline(b.text) };
+    if (b.type === "quote")
+      return { type: "blockquote", content: [{ type: "paragraph", content: parseInline(b.text) }] };
+    if (b.type === "code")
+      return { type: "codeBlock", content: b.text ? [{ type: "text", text: b.text }] : [] };
+    if (b.type === "image")
+      return { type: "image", attrs: { src: b.src ?? "", alt: b.alt ?? "" } };
+    return { type: "paragraph", content: parseInline(b.text) };
+  });
+  return { type: "doc", content: content.length ? content : [{ type: "paragraph" }] };
 }
 
 export function calcReadingTime(text: string): string {

@@ -1,43 +1,87 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
-import { calcReadingTime } from "@/data/dummy";
-import { X, ImagePlus, Loader2, CheckCircle } from "lucide-react";
+import { calcReadingTime, type Article } from "@/data/dummy";
+import StoryEditor from "@/components/StoryEditor";
+import { X, ImagePlus, Loader2, CheckCircle, Info } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 
-export default function WritePage() {
-  const { addBlog, categories } = useBlogs();
+function WritePageInner() {
+  const { addBlog, updateBlog, getBlog, categories, loading } = useBlogs();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("id");
+  const isEditing = !!editId;
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
 
-  // Set default category when categories list loads
+  // Set default category when categories list loads (new posts only)
   useEffect(() => {
-    if (categories.length > 0 && !category) {
+    if (!isEditing && categories.length > 0 && !category) {
       setCategory(categories[0]);
     }
-  }, [categories, category]);
+  }, [categories, category, isEditing]);
   const [content, setContent] = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [existingCover, setExistingCover] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  const contentRef = useRef<HTMLTextAreaElement>(null);
+  // Edit mode: hydrate the form from the existing story once it loads.
+  const [hydrated, setHydrated] = useState(!editId); // new post is ready immediately
+  const [notFound, setNotFound] = useState(false);
+  const originalStatus = useRef<Article["status"] | null>(null);
+  const originalDate = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!editId || hydrated || !user) return;
+    const blog = getBlog(editId);
+    if (blog) {
+      if (blog.authorId !== user.id) {
+        setNotFound(true);
+      } else {
+        setTitle(blog.title);
+        setDescription(blog.description);
+        setCategory(blog.category);
+        setContent(blog.content);
+        setCoverPreview(blog.coverImage ?? null);
+        setExistingCover(blog.coverImage);
+        originalStatus.current = blog.status;
+        originalDate.current = blog.date;
+      }
+      setHydrated(true);
+    } else if (!loading) {
+      setNotFound(true);
+      setHydrated(true);
+    }
+  }, [editId, hydrated, user, loading, getBlog]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  const subtitleRef = useRef<HTMLTextAreaElement>(null);
 
   function autoResize(el: HTMLTextAreaElement) {
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
   }
+
+  // Grow the title/subtitle textareas to fit content loaded in edit mode.
+  useEffect(() => {
+    if (titleRef.current) autoResize(titleRef.current);
+    if (subtitleRef.current) autoResize(subtitleRef.current);
+  }, [hydrated]);
+
+  const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -58,37 +102,50 @@ export default function WritePage() {
 
     setSubmitting(true);
     try {
-      let coverImage: string | undefined;
-
+      // Keep the existing cover unless a new file was chosen.
+      let coverImage: string | undefined = existingCover;
       if (coverFile) {
         const storageRef = ref(storage, `covers/${Date.now()}_${coverFile.name}`);
         const snapshot = await uploadBytes(storageRef, coverFile);
         coverImage = await getDownloadURL(snapshot.ref);
       }
 
-      const now = new Date();
-      const date = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-      await addBlog({
-        title: title.trim(),
-        description: description.trim() || title.trim(),
-        author: `${user.firstName} ${user.lastName}`,
-        authorId: user.id,
-        date,
-        readingTime: calcReadingTime(content),
-        category,
-        claps: 0,
-        responses: 0,
-        content: content.trim(),
-        coverImage,
-        views: 0,
-        status: "pending",
-      });
+      if (isEditing && editId) {
+        // Medium behavior: editing a published story updates it live; anything
+        // not yet published goes (back) to pending review.
+        await updateBlog(editId, {
+          title: title.trim(),
+          description: description.trim() || title.trim(),
+          category,
+          content: content.trim(),
+          readingTime: calcReadingTime(content),
+          coverImage,
+          status: originalStatus.current === "published" ? "published" : "pending",
+        });
+      } else {
+        const now = new Date();
+        const date = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        await addBlog({
+          title: title.trim(),
+          description: description.trim() || title.trim(),
+          author: `${user.firstName} ${user.lastName}`,
+          authorId: user.id,
+          date,
+          readingTime: calcReadingTime(content),
+          category,
+          claps: 0,
+          responses: 0,
+          content: content.trim(),
+          coverImage,
+          views: 0,
+          status: "pending",
+        });
+      }
 
       setSubmitted(true);
     } catch (err) {
       console.error(err);
-      setError("Failed to submit. Please try again.");
+      setError("Failed to save. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -114,20 +171,29 @@ export default function WritePage() {
   }
 
   if (submitted) {
+    const wentLive = isEditing && originalStatus.current === "published";
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center max-w-sm px-6">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
             <CheckCircle size={32} className="text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold mb-3">Story submitted!</h2>
-          <p className="text-secondary mb-2 leading-relaxed">
-            Your story is now <span className="font-semibold text-amber-600">pending review</span> by the admin.
-          </p>
-          <p className="text-secondary text-sm mb-8">
-            Once approved, it will appear on the home feed. You can track its status in your dashboard.
-          </p>
-          <div className="flex gap-3 justify-center">
+          <h2 className="text-2xl font-bold mb-3">{isEditing ? "Story updated!" : "Story submitted!"}</h2>
+          {wentLive ? (
+            <p className="text-secondary mb-2 leading-relaxed">
+              Your changes are now <span className="font-semibold text-green-600">live</span>.
+            </p>
+          ) : (
+            <>
+              <p className="text-secondary mb-2 leading-relaxed">
+                Your story is now <span className="font-semibold text-amber-600">pending review</span> by the admin.
+              </p>
+              <p className="text-secondary text-sm mb-8">
+                Once approved, it will appear on the home feed. You can track its status in your dashboard.
+              </p>
+            </>
+          )}
+          <div className="flex gap-3 justify-center mt-6">
             <Link href="/dashboard" className="bg-button text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-button/90 transition-colors">
               My Dashboard
             </Link>
@@ -136,6 +202,28 @@ export default function WritePage() {
             </Link>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isEditing && notFound) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center max-w-sm px-6">
+          <h2 className="text-2xl font-bold mb-3">Story not available</h2>
+          <p className="text-secondary mb-6">This story doesn&apos;t exist, or it isn&apos;t yours to edit.</p>
+          <Link href="/dashboard" className="bg-button text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-button/90 transition-colors">
+            Back to dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEditing && !hydrated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 size={22} className="animate-spin text-secondary" />
       </div>
     );
   }
@@ -154,36 +242,41 @@ export default function WritePage() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-3">
-            {error && <p className="text-sm text-red-500 max-w-xs truncate">{error}</p>}
+          <div className="flex items-center gap-4">
+            {wordCount > 0 && (
+              <span className="text-xs text-secondary/60 hidden sm:block">
+                {wordCount} {wordCount === 1 ? "word" : "words"} · {calcReadingTime(content)}
+              </span>
+            )}
+            {error && <p className="text-sm text-red-500 max-w-[160px] truncate">{error}</p>}
             <button
               onClick={handleSubmit}
               disabled={submitting}
               className="bg-button text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-button/90 transition-colors disabled:opacity-60 flex items-center gap-2"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
-              {submitting ? "Submitting…" : "Submit for Review"}
+              {submitting ? "Saving…" : isEditing ? "Update" : "Submit"}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Editor */}
-      <main className="max-w-[680px] mx-auto px-6 pt-12 pb-32">
+      {/* Editor — a clean, distraction-free writing canvas */}
+      <main className="max-w-[720px] mx-auto px-6 pt-10 pb-40">
 
-        {/* Author info (read-only from auth) */}
-        <div className="flex items-center gap-3 mb-8 p-3 bg-secondary/5 rounded-xl border border-border">
-          <div className="w-8 h-8 rounded-full bg-accent/15 flex items-center justify-center text-sm font-bold text-accent">
+        {/* Author + category — borderless, quiet */}
+        <div className="flex items-center gap-3 mb-10">
+          <div className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center text-sm font-bold text-accent">
             {user.firstName[0]}
           </div>
-          <div>
+          <div className="leading-tight">
             <p className="text-sm font-medium">{user.firstName} {user.lastName}</p>
-            <p className="text-xs text-secondary">{user.role}</p>
+            <p className="text-xs text-secondary capitalize">{isEditing ? `Editing · ${originalStatus.current ?? ""}` : "Draft"}</p>
           </div>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="ml-auto text-sm text-secondary bg-secondary/8 rounded-full px-4 py-2 outline-none border-0 cursor-pointer"
+            className="ml-auto text-sm text-secondary bg-transparent hover:bg-secondary/8 rounded-full px-3 py-1.5 outline-none border border-border cursor-pointer transition-colors"
           >
             {categories.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -191,88 +284,89 @@ export default function WritePage() {
           </select>
         </div>
 
-        {/* Cover image upload */}
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          className="mb-8 cursor-pointer group"
-        >
-          {coverPreview ? (
-            <div className="relative">
-              <img src={coverPreview} alt="Cover" className="w-full h-48 object-cover rounded-xl" />
-              <div className="absolute inset-0 rounded-xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <p className="text-white text-sm font-medium">Change cover</p>
-              </div>
+        {/* Cover image — a subtle affordance, not a big box */}
+        {coverPreview ? (
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="mb-10 cursor-pointer group relative"
+          >
+            <img src={coverPreview} alt="Cover" className="w-full h-60 object-cover rounded-2xl" />
+            <div className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <p className="text-white text-sm font-medium">Change cover</p>
             </div>
-          ) : (
-            <div className="w-full h-36 rounded-xl border-2 border-dashed border-border hover:border-accent transition-colors flex flex-col items-center justify-center gap-2 text-secondary hover:text-accent">
-              <ImagePlus size={24} />
-              <p className="text-sm">Add cover image (optional)</p>
-            </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleCoverChange}
-            className="hidden"
-          />
-        </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="mb-8 inline-flex items-center gap-2 text-sm text-secondary hover:text-accent transition-colors"
+          >
+            <ImagePlus size={18} /> Add cover image
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleCoverChange}
+          className="hidden"
+        />
 
         {/* Title */}
         <textarea
+          ref={titleRef}
           placeholder="Title"
           value={title}
           onChange={(e) => { setTitle(e.target.value); autoResize(e.target); }}
-          rows={2}
-          className="serif w-full text-4xl md:text-5xl font-bold text-foreground placeholder:text-foreground/20 bg-transparent border-0 outline-none resize-none leading-tight tracking-tight mb-4 overflow-hidden"
+          rows={1}
+          className="serif w-full text-4xl md:text-5xl font-bold text-foreground placeholder:text-foreground/15 bg-transparent border-0 outline-none resize-none leading-tight tracking-tight mb-3 overflow-hidden"
           style={{ height: "auto" }}
         />
 
         {/* Subtitle */}
         <textarea
+          ref={subtitleRef}
           placeholder="Tell your story's key insight… (optional)"
           value={description}
           onChange={(e) => { setDescription(e.target.value); autoResize(e.target); }}
-          rows={2}
-          className="w-full text-xl text-secondary placeholder:text-secondary/30 bg-transparent border-0 outline-none resize-none leading-relaxed mb-10 font-light overflow-hidden"
+          rows={1}
+          className="w-full text-xl text-secondary placeholder:text-secondary/25 bg-transparent border-0 outline-none resize-none leading-relaxed mb-8 font-light overflow-hidden"
           style={{ height: "auto" }}
         />
 
-        <div className="border-t border-border mb-10" />
-
-        {/* Content */}
-        <textarea
-          ref={contentRef}
-          placeholder={`Write your story here…\n\nUse blank lines to separate paragraphs.`}
-          value={content}
-          onChange={(e) => { setContent(e.target.value); autoResize(e.target); }}
-          rows={20}
-          className="w-full text-lg text-foreground placeholder:text-secondary/30 bg-transparent border-0 outline-none resize-none leading-[1.85] font-light overflow-hidden"
-          style={{ minHeight: "400px", height: "auto" }}
-        />
+        {/* Content — Medium-style WYSIWYG editor */}
+        <StoryEditor key={editId ?? "new"} value={content} onChange={setContent} />
 
         {content.length === 0 && (
-          <div className="mt-8 p-5 bg-secondary/4 rounded-xl border border-border">
-            <p className="text-xs font-semibold text-accent uppercase tracking-widest mb-3">Formatting tips</p>
-            <div className="space-y-2 text-sm text-secondary">
-              <p><span className="font-mono bg-secondary/10 px-1.5 py-0.5 rounded text-foreground">## Heading</span> → Section heading</p>
-              <p><span className="font-mono bg-secondary/10 px-1.5 py-0.5 rounded text-foreground">### Sub-heading</span> → Sub-section</p>
-              <p>Blank line between paragraphs to separate them.</p>
-            </div>
-          </div>
-        )}
-
-        {content.length > 0 && (
-          <p className="text-xs text-secondary/50 mt-4 text-right">
-            {content.trim().split(/\s+/).filter(Boolean).length} words · {calcReadingTime(content)}
+          <p className="mt-6 text-sm text-secondary/45">
+            Select any text to format it, paste an image, or just start writing.
           </p>
         )}
 
-        {/* Review notice */}
-        <div className="mt-10 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-          <span className="font-semibold">Note:</span> Your story will be reviewed by an admin before it appears publicly. You can track the status in your dashboard.
+        {/* Review notice — quiet, single line */}
+        <div className="mt-20 pt-6 border-t border-border flex items-start gap-2 text-xs text-secondary">
+          <Info size={14} className="mt-0.5 flex-shrink-0" />
+          <p>
+            {isEditing && originalStatus.current === "published"
+              ? "Changes to a published story go live immediately."
+              : "Your story will be reviewed by an admin before it appears publicly. Track its status in your dashboard."}
+          </p>
         </div>
       </main>
     </div>
+  );
+}
+
+export default function WritePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <Loader2 size={22} className="animate-spin text-secondary" />
+        </div>
+      }
+    >
+      <WritePageInner />
+    </Suspense>
   );
 }

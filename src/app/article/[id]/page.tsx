@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useBlogs } from "@/context/BlogContext";
-import { parseContent } from "@/data/dummy";
+import { parseContent, renderInline } from "@/data/dummy";
 import {
   ArrowLeft, Bookmark, Heart, MessageCircle, Share2, Trash2,
   Volume2, Play, Pause, Square, ChevronUp, ChevronDown, Gauge,
@@ -547,7 +547,7 @@ export default function ArticlePage() {
               </div>
 
               {/* ── Content with audio highlighting ── */}
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {blocksWithPos.map((block, i) => {
                   const audioOn = audioState !== "idle" || readPos > 0;
                   const isRead = audioOn && readPos >= block.end;
@@ -566,9 +566,8 @@ export default function ArticlePage() {
                         key={i}
                         id={block.id}
                         className={`serif text-2xl font-bold mt-10 mb-2 tracking-tight scroll-mt-24 transition-colors duration-700 ${color}`}
-                      >
-                        {block.text}
-                      </h2>
+                        dangerouslySetInnerHTML={{ __html: renderInline(block.text) }}
+                      />
                     );
                   if (block.type === "h3")
                     return (
@@ -576,14 +575,25 @@ export default function ArticlePage() {
                         key={i}
                         id={block.id}
                         className={`serif text-xl font-semibold mt-8 mb-2 tracking-tight scroll-mt-24 transition-colors duration-700 ${color}`}
-                      >
-                        {block.text}
-                      </h3>
+                        dangerouslySetInnerHTML={{ __html: renderInline(block.text) }}
+                      />
+                    );
+                  if (block.type === "image")
+                    return (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={block.src}
+                        alt={block.alt ?? ""}
+                        className="story-image w-full rounded-xl my-4"
+                      />
                     );
                   return (
-                    <p key={i} className={`text-lg leading-[1.85] font-light transition-colors duration-700 ${color}`}>
-                      {block.text}
-                    </p>
+                    <p
+                      key={i}
+                      className={`text-lg leading-[1.7] font-light transition-colors duration-700 ${color}`}
+                      dangerouslySetInnerHTML={{ __html: renderInline(block.text) }}
+                    />
                   );
                 })}
               </div>

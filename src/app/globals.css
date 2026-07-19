@@ -116,6 +116,53 @@
   }
 }
 
+/* WYSIWYG editor (Tiptap / ProseMirror) */
+.ProseMirror,
+.ProseMirror:focus,
+.ProseMirror:focus-visible {
+  outline: none;
+  min-height: 400px;
+}
+
+/* Medium-style placeholder on the empty editor */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--color-secondary) 40%, transparent);
+}
+
+/* Inline code inside the editor (block code uses .prose-zeni code) */
+.ProseMirror p code {
+  @apply font-mono text-sm bg-secondary/10 text-foreground px-1.5 py-0.5 rounded;
+}
+
+/* Tighter line spacing in the writing surface (overrides .prose-zeni p 1.85) */
+.ProseMirror p {
+  line-height: 1.65;
+  margin-bottom: 0.55rem;
+}
+.ProseMirror h2 { margin-top: 1.4rem; }
+.ProseMirror h3 { margin-top: 1.1rem; }
+
+/* Images pasted / dropped into the editor */
+.ProseMirror img,
+.story-image {
+  border-radius: 0.75rem;
+  margin: 1rem 0;
+  max-width: 100%;
+  height: auto;
+}
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-accent);
+}
+
+/* Links in editor and published article */
+.story-link {
+  @apply text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
-import { Eye, Clock, PenLine, CheckCircle, XCircle, Hourglass, BarChart2 } from "lucide-react";
+import { Eye, Clock, PenLine, CheckCircle, XCircle, Hourglass, BarChart2, Pencil, Trash2 } from "lucide-react";
 import { formatNum } from "@/data/dummy";
 
 const STATUS_CONFIG = {
@@ -32,7 +32,21 @@ const STATUS_CONFIG = {
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
-  const { blogs, loading } = useBlogs();
+  const { blogs, loading, deleteBlog } = useBlogs();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    try {
+      await deleteBlog(id);
+    } catch (err) {
+      console.error("Delete failed:", err);
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
+  }
 
   const myBlogs = useMemo(
     () => blogs.filter((b) => b.authorId === user?.id),
@@ -175,6 +189,40 @@ export default function DashboardPage() {
                       <span className="flex items-center gap-1 text-xs text-secondary">
                         <Eye size={11} /> {formatNum(blog.views ?? 0)} views
                       </span>
+
+                      {/* Actions */}
+                      {confirmDeleteId === blog.id ? (
+                        <span className="ml-auto flex items-center gap-2 text-xs">
+                          <span className="text-secondary">Delete?</span>
+                          <button
+                            onClick={() => handleDelete(blog.id)}
+                            disabled={deletingId === blog.id}
+                            className="font-medium text-red-600 hover:text-red-700 disabled:opacity-60"
+                          >
+                            {deletingId === blog.id ? "Deleting…" : "Yes"}
+                          </button>
+                          <button onClick={() => setConfirmDeleteId(null)} className="text-secondary hover:text-foreground">
+                            No
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="ml-auto flex items-center gap-1">
+                          <Link
+                            href={`/write?id=${blog.id}`}
+                            title="Edit"
+                            className="flex items-center gap-1 text-xs text-secondary hover:text-accent px-2 py-1 rounded-lg hover:bg-secondary/8 transition-colors"
+                          >
+                            <Pencil size={13} /> Edit
+                          </Link>
+                          <button
+                            onClick={() => setConfirmDeleteId(blog.id)}
+                            title="Delete"
+                            className="flex items-center gap-1 text-xs text-secondary hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </span>
+                      )}
                     </div>
 
                     {/* Rejection reason */}
