@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useBlogs } from "@/context/BlogContext";
-import { parseContent, renderInline } from "@/data/dummy";
+import { parseContent, renderInline, renderTable } from "@/data/dummy";
 import {
   ArrowLeft, Bookmark, Heart, MessageCircle, Share2, Trash2,
   Volume2, Play, Pause, Square, ChevronUp, ChevronDown, Gauge,
@@ -12,12 +12,75 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
+// Custom Social Icon SVGs to bypass legacy Lucide-React version constraints & lock dimensions safely
+const TwitterIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+const LinkedinIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path fillRule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" clipRule="evenodd" />
+  </svg>
+);
+
+const GithubIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.577.688.479C19.138 20.162 22 16.418 22 12c0-5.523-4.477-10-10-10z" clipRule="evenodd" />
+  </svg>
+);
+
+const WebsiteIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+const InstagramIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+  </svg>
+);
+
+const FacebookIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
+  </svg>
+);
+
+const PinterestIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.41 7.61 11.162-.102-.947-.19-2.399.04-3.43.207-.887 1.334-5.642 1.334-5.642s-.34-.68-.34-1.686c0-1.58.917-2.76 2.06-2.76 1.016 0 1.507.76 1.507 1.67 0 1.02-.65 2.54-.985 3.96-.28 1.18.599 2.146 1.762 2.146 2.115 0 3.743-2.23 3.743-5.449 0-2.848-2.048-4.84-4.966-4.84-3.38 0-5.36 2.53-5.36 5.148 0 1.02.393 2.117.88 2.709.097.118.11.22.08.344l-.34 1.385c-.055.22-.18.268-.415.158-1.55-.72-2.518-2.985-2.518-4.793 0-3.899 2.833-7.482 8.18-7.482 4.293 0 7.63 3.06 7.63 7.15 0 4.268-2.69 7.707-6.42 7.707-1.254 0-2.433-.651-2.837-1.42l-.773 2.94c-.28 1.066-1.037 2.404-1.543 3.228 1.127.35 2.32.54 3.555.54 6.622 0 11.988-5.366 11.988-11.987C24.004 5.367 18.638 0 12.017 0z" />
+  </svg>
+);
+
+const ThreadsIcon = ({ className = "" }: { className?: string }) => (
+  <svg className={`w-4 h-4 flex-shrink-0 ${className}`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M13.56 12.38c-.1-.76-.66-1.28-1.46-1.28-.76 0-1.34.52-1.48 1.28h2.94zm2.14 0c-.1 1.74-1.38 3.12-3.34 3.12-1.42 0-2.64-.78-3.14-2h6.58c.04-.38.08-.74.08-1.12 0-3.04-2.18-5.18-5.24-5.18-3.14 0-5.24 2.2-5.24 5.18 0 3.06 2.18 5.24 5.24 5.24 1.34 0 2.58-.46 3.58-1.3l.08.08c1.38 1.38 3.32 1.66 4.96.8a8.3 8.3 0 0 0 4.46-7.38c0-5.18-4.22-9.4-9.4-9.4S2.6 6.82 2.6 12s4.22 9.4 9.4 9.4c1.92 0 3.76-.58 5.3-1.68l-1.3-1.64A9.5 9.5 0 0 1 12 19.34c-4.08 0-7.4-3.32-7.4-7.4s3.32-7.4 7.4-7.4 7.4 3.32 7.4 7.4c0 2.42-1.34 4.36-3.4 4.36-1 0-1.78-.54-2.16-1.32-.4.8-.96 1.32-1.92 1.32-1.8 0-2.92-1.42-2.92-3.34 0-1.94 1.12-3.36 2.92-3.36.96 0 1.52.52 1.92 1.3.16-.76.78-1.3 1.78-1.3.94 0 1.84.48 2.22 1.26a5.55 5.55 0 0 1 .1 1.26h.02z" />
+  </svg>
+);
+
 function fmt(n: number) {
   return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(n);
 }
 function fmtTime(s: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1")
+    .trim();
+}
+
 
 export default function ArticlePage() {
   const { id } = useParams<{ id: string }>();
@@ -25,9 +88,14 @@ export default function ArticlePage() {
     getBlog, deleteBlog, blogs, incrementViews,
     incrementClaps, decrementClaps, comments, addComment, deleteComment, likeComment
   } = useBlogs();
-  const { user, toggleSaveArticle, toggleLikeArticle } = useAuth();
+  const { user, users, toggleSaveArticle, toggleLikeArticle } = useAuth();
   const router = useRouter();
   const article = getBlog(id);
+
+  const authorUser = useMemo(() => {
+    if (!article) return null;
+    return users.find((u) => u.id === article.authorId);
+  }, [users, article]);
 
   useEffect(() => {
     if (!id) return;
@@ -79,6 +147,7 @@ export default function ArticlePage() {
   // — speed test —
   const [speedWpm, setSpeedWpm] = useState(250);
   const [speedActive, setSpeedActive] = useState(false);
+  const [speedOpen, setSpeedOpen] = useState(false);
   const [speedWords, setSpeedWords] = useState<string[]>([]);
   const [speedIdx, setSpeedIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -292,11 +361,11 @@ export default function ArticlePage() {
       </header>
 
       {/* ── Three-column layout ── */}
-      <div className="max-w-[1300px] mx-auto px-6 pt-12 pb-28 flex gap-8 items-start">
+      <div className="max-w-[1300px] mx-auto px-6 pt-12 pb-28 flex justify-between items-start">
 
         {/* ── LEFT: Table of Contents ── */}
-        <aside className="hidden xl:block w-[190px] flex-shrink-0">
-          <div className="sticky top-24">
+        <aside className="hidden xl:block w-[190px] flex-shrink-0 sticky top-24">
+          <div>
             {headings.length > 0 ? (
               <>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-accent mb-4">
@@ -315,7 +384,7 @@ export default function ArticlePage() {
                           : "border-transparent text-secondary/70 hover:text-foreground hover:border-secondary/40"
                       }`}
                     >
-                      {h.text}
+                      {stripMarkdown(h.text)}
                     </button>
                   ))}
                 </nav>
@@ -391,26 +460,45 @@ export default function ArticlePage() {
                 <p className="text-xl text-secondary leading-relaxed mb-8 font-light">{article.description}</p>
               )}
 
-              {/* author + listen */}
-              <div className="flex items-center gap-4 pb-5 border-b border-border">
-                <div className="w-10 h-10 rounded-full bg-accent/15 flex items-center justify-center font-bold text-accent text-sm flex-shrink-0">
-                  {article.author[0]?.toUpperCase()}
+              {/* author + listen + speed read */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-border">
+                <Link href={`/profile/${article.authorId}`} className="flex items-center gap-4 hover:opacity-85 transition-opacity group">
+                  <div className="w-10 h-10 rounded-full bg-accent/15 flex items-center justify-center font-bold text-accent text-sm flex-shrink-0 group-hover:scale-102 transition-transform duration-200">
+                    {article.author[0]?.toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-foreground group-hover:text-accent transition-colors">{article.author}</p>
+                    <p className="text-xs text-secondary mt-0.5">
+                      {article.readingTime} · {article.date} · {fmt(article.views ?? 0)} views
+                    </p>
+                  </div>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setAudioOpen((v) => !v);
+                      setSpeedOpen(false);
+                    }}
+                    className={`flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                      audioOpen ? "border-accent text-accent bg-accent/5" : "border-border text-secondary hover:text-foreground"
+                    }`}
+                  >
+                    <Volume2 size={14} />
+                    Listen
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSpeedOpen((v) => !v);
+                      setAudioOpen(false);
+                    }}
+                    className={`flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                      speedOpen ? "border-accent text-accent bg-accent/5" : "border-border text-secondary hover:text-foreground"
+                    }`}
+                  >
+                    <Gauge size={14} />
+                    Speed Read
+                  </button>
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">{article.author}</p>
-                  <p className="text-xs text-secondary mt-0.5">
-                    {article.readingTime} · {article.date} · {fmt(article.views ?? 0)} views
-                  </p>
-                </div>
-                <button
-                  onClick={() => setAudioOpen((v) => !v)}
-                  className={`flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-full border transition-colors ${
-                    audioOpen ? "border-accent text-accent bg-accent/5" : "border-border text-secondary hover:text-foreground"
-                  }`}
-                >
-                  <Volume2 size={14} />
-                  Listen
-                </button>
               </div>
 
               {/* ── Audio Player ── */}
@@ -420,7 +508,7 @@ export default function ArticlePage() {
                     {/* play/pause */}
                     <button
                       onClick={audioState === "playing" ? audioPause : audioPlay}
-                      className="w-8 h-8 rounded-full bg-button text-white flex items-center justify-center hover:bg-button/80 transition-colors flex-shrink-0"
+                      className="w-8 h-8 rounded-full bg-button text-white flex items-center justify-center hover:bg-button/80 transition-colors flex-shrink-0 cursor-pointer"
                     >
                       {audioState === "playing"
                         ? <Pause size={13} fill="currentColor" />
@@ -428,7 +516,7 @@ export default function ArticlePage() {
                       }
                     </button>
                     {/* stop */}
-                    <button onClick={audioStop} className="text-secondary hover:text-foreground transition-colors flex-shrink-0">
+                    <button onClick={audioStop} className="text-secondary hover:text-foreground transition-colors flex-shrink-0 cursor-pointer">
                       <Square size={15} fill="currentColor" />
                     </button>
                     {/* progress bar */}
@@ -444,7 +532,7 @@ export default function ArticlePage() {
                         <button
                           key={r}
                           onClick={() => changeRate(r)}
-                          className={`text-[11px] px-1.5 py-0.5 rounded transition-colors font-medium ${
+                          className={`text-[11px] px-1.5 py-0.5 rounded transition-colors font-medium cursor-pointer ${
                             audioRate === r ? "bg-button text-white" : "text-secondary hover:text-foreground"
                           }`}
                         >
@@ -475,7 +563,7 @@ export default function ArticlePage() {
                               }
                             }}
                             title={`${v.name} (${v.lang})`}
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors max-w-[120px] truncate ${
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors max-w-[120px] truncate cursor-pointer ${
                               selectedVoice === v.name
                                 ? "bg-button text-white"
                                 : "bg-secondary/8 text-secondary hover:bg-secondary/20"
@@ -504,6 +592,70 @@ export default function ArticlePage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── Collapsible Mobile Speed Reader Settings ── */}
+              {speedOpen && (
+                <div className="lg:hidden mt-4 mb-4 p-5 rounded-xl border border-border bg-secondary/3">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                      <Gauge size={16} className="text-accent" />
+                    </div>
+                    <h3 className="font-bold text-sm">Speed Reading Settings</h3>
+                  </div>
+                  <p className="text-xs text-secondary leading-relaxed mb-5">
+                    Words flash one at a time. Read as fast as you can — then push higher.
+                  </p>
+
+                  {/* WPM slider */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-secondary">Speed</span>
+                      <span className="text-sm font-bold text-accent">{speedWpm} WPM</span>
+                    </div>
+                    <input
+                      type="range" min={100} max={600} step={50}
+                      value={speedWpm}
+                      onChange={(e) => setSpeedWpm(Number(e.target.value))}
+                      className="w-full accent-foreground h-1 cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] text-secondary/40 mt-1">
+                      <span>100</span><span>600</span>
+                    </div>
+                  </div>
+
+                  {/* words/flash indicator */}
+                  <div className="flex items-center justify-between mb-4 px-3 py-2 bg-white border border-border rounded-lg">
+                    <span className="text-xs text-secondary">Words per flash</span>
+                    <span className="text-sm font-bold">{wpc}</span>
+                  </div>
+
+                  {/* preset buttons */}
+                  <div className="grid grid-cols-4 gap-1 mb-4">
+                    {[150, 250, 350, 500].map((w) => (
+                      <button
+                        key={w}
+                        onClick={() => setSpeedWpm(w)}
+                        className={`py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          speedWpm === w ? "bg-button text-white" : "bg-white border border-border text-secondary hover:bg-secondary/10"
+                        }`}
+                      >
+                        {w}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setSpeedOpen(false);
+                      doStart(speedWpm);
+                    }}
+                    className="w-full bg-button text-white text-sm font-medium py-2.5 rounded-full hover:bg-button/90 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Play size={13} fill="currentColor" />
+                    Start reading
+                  </button>
                 </div>
               )}
 
@@ -588,6 +740,14 @@ export default function ArticlePage() {
                         className="story-image w-full rounded-xl my-4"
                       />
                     );
+                  if (block.type === "table")
+                    return (
+                      <div
+                        key={i}
+                        className={`transition-colors duration-700 ${color}`}
+                        dangerouslySetInnerHTML={{ __html: renderTable(block.text) }}
+                      />
+                    );
                   return (
                     <p
                       key={i}
@@ -618,13 +778,64 @@ export default function ArticlePage() {
               {/* author card */}
               <div className="mt-12 p-7 border border-border rounded-2xl">
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-full bg-accent/15 flex items-center justify-center font-bold text-accent text-xl flex-shrink-0">
-                    {article.author[0]?.toUpperCase()}
-                  </div>
+                  <Link href={`/profile/${article.authorId}`} className="hover:opacity-85 transition-opacity flex-shrink-0">
+                    <div className="w-14 h-14 rounded-full bg-accent/15 flex items-center justify-center font-bold text-accent text-xl shadow-sm hover:scale-102 transition-transform duration-200">
+                      {article.author[0]?.toUpperCase()}
+                    </div>
+                  </Link>
                   <div>
                     <p className="text-xs text-accent uppercase tracking-widest mb-1 font-medium">Written by</p>
-                    <h4 className="font-bold text-lg mb-3">{article.author}</h4>
-                    <Link href="/write" className="inline-block bg-button text-white text-sm px-5 py-2 rounded-full hover:bg-button/90 transition-colors">
+                    <Link href={`/profile/${article.authorId}`} className="hover:underline">
+                      <h4 className="font-bold text-lg mb-1.5 text-foreground hover:text-accent transition-colors">{article.author}</h4>
+                    </Link>
+
+                    {/* author socials */}
+                    {authorUser?.socials && Object.values(authorUser.socials).some(Boolean) && (
+                      <div className="flex items-center gap-2.5 mb-3.5 mt-1.5 text-secondary flex-wrap">
+                        {authorUser.socials.twitter && (
+                          <a href={authorUser.socials.twitter} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="Twitter / X">
+                            <TwitterIcon />
+                          </a>
+                        )}
+                        {authorUser.socials.linkedin && (
+                          <a href={authorUser.socials.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="LinkedIn">
+                            <LinkedinIcon />
+                          </a>
+                        )}
+                        {authorUser.socials.github && (
+                          <a href={authorUser.socials.github} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="GitHub">
+                            <GithubIcon />
+                          </a>
+                        )}
+                        {authorUser.socials.website && (
+                          <a href={authorUser.socials.website} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="Website">
+                            <WebsiteIcon />
+                          </a>
+                        )}
+                        {authorUser.socials.instagram && (
+                          <a href={authorUser.socials.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="Instagram">
+                            <InstagramIcon />
+                          </a>
+                        )}
+                        {authorUser.socials.facebook && (
+                          <a href={authorUser.socials.facebook} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="Facebook">
+                            <FacebookIcon />
+                          </a>
+                        )}
+                        {authorUser.socials.pinterest && (
+                          <a href={authorUser.socials.pinterest} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="Pinterest">
+                            <PinterestIcon />
+                          </a>
+                        )}
+                        {authorUser.socials.threads && (
+                          <a href={authorUser.socials.threads} target="_blank" rel="noopener noreferrer" className="hover:text-accent p-1 transition-colors" title="Threads">
+                            <ThreadsIcon />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    <Link href="/write" className="inline-block bg-button text-white text-sm px-5 py-2 rounded-full hover:bg-button/90 transition-colors mt-1">
                       Write a story
                     </Link>
                   </div>
@@ -658,8 +869,8 @@ export default function ArticlePage() {
         </main>
 
         {/* ── RIGHT: Speed Test Card ── */}
-        <aside className="hidden lg:block w-[240px] flex-shrink-0">
-          <div className="sticky top-24">
+        <aside className="hidden lg:block w-[240px] flex-shrink-0 sticky top-24">
+          <div>
             {!speedActive ? (
               /* idle card */
               <div className="border border-border rounded-2xl p-5">

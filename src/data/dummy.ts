@@ -15,6 +15,17 @@ export interface User {
   isActive: boolean;
   savedArticles?: string[];
   likedArticles?: string[];
+  followingUsers?: string[];
+  socials?: {
+    twitter?: string;
+    linkedin?: string;
+    github?: string;
+    website?: string;
+    instagram?: string;
+    facebook?: string;
+    pinterest?: string;
+    threads?: string;
+  };
 }
 
 export interface Article {
@@ -123,7 +134,7 @@ export const CATEGORY_GRADIENT: Record<string, string> = {
 };
 
 export interface ContentBlock {
-  type: "h2" | "h3" | "paragraph" | "quote" | "code" | "image";
+  type: "h2" | "h3" | "paragraph" | "quote" | "code" | "image" | "table";
   text: string;
   id: string;
   src?: string;
@@ -143,6 +154,8 @@ export function parseContent(raw: string): ContentBlock[] {
   let paraLines: string[] = [];
   let inCode = false;
   let codeLines: string[] = [];
+  let inTable = false;
+  let tableLines: string[] = [];
 
   function flushPara() {
     const text = paraLines.join(" ").trim();
@@ -150,40 +163,56 @@ export function parseContent(raw: string): ContentBlock[] {
     paraLines = [];
   }
 
+  function flushTable() {
+    const text = tableLines.join("\n").trim();
+    if (text) blocks.push({ type: "table", text, id: "" });
+    tableLines = [];
+    inTable = false;
+  }
+
   for (const line of lines) {
     if (line.startsWith("```")) {
+      flushPara();
+      flushTable();
       if (inCode) {
         blocks.push({ type: "code", text: codeLines.join("\n"), id: "" });
         codeLines = [];
         inCode = false;
       } else {
-        flushPara();
         inCode = true;
       }
     } else if (inCode) {
       codeLines.push(line);
-    } else if (line.startsWith("## ")) {
+    } else if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
       flushPara();
-      const text = line.slice(3).trim();
-      blocks.push({ type: "h2", text, id: slugify(text) });
-    } else if (line.startsWith("### ")) {
-      flushPara();
-      const text = line.slice(4).trim();
-      blocks.push({ type: "h3", text, id: slugify(text) });
-    } else if (line.startsWith("> ")) {
-      flushPara();
-      blocks.push({ type: "quote", text: line.slice(2).trim(), id: "" });
-    } else if (IMAGE_LINE.test(line.trim())) {
-      flushPara();
-      const [, alt, src] = line.trim().match(IMAGE_LINE)!;
-      blocks.push({ type: "image", text: alt, id: "", src, alt });
-    } else if (line.trim() === "") {
-      flushPara();
+      inTable = true;
+      tableLines.push(line.trim());
     } else {
-      paraLines.push(line);
+      flushTable();
+      if (line.startsWith("## ")) {
+        flushPara();
+        const text = line.slice(3).trim();
+        blocks.push({ type: "h2", text, id: slugify(text) });
+      } else if (line.startsWith("### ")) {
+        flushPara();
+        const text = line.slice(4).trim();
+        blocks.push({ type: "h3", text, id: slugify(text) });
+      } else if (line.startsWith("> ")) {
+        flushPara();
+        blocks.push({ type: "quote", text: line.slice(2).trim(), id: "" });
+      } else if (IMAGE_LINE.test(line.trim())) {
+        flushPara();
+        const [, alt, src] = line.trim().match(IMAGE_LINE)!;
+        blocks.push({ type: "image", text: alt, id: "", src, alt });
+      } else if (line.trim() === "") {
+        flushPara();
+      } else {
+        paraLines.push(line);
+      }
     }
   }
   flushPara();
+  flushTable();
   return blocks;
 }
 
@@ -212,6 +241,39 @@ export function renderInline(text: string): string {
       if (!href) return label; // drop unsafe links, keep the text
       return `<a href="${href.replace(/"/g, "&quot;")}" target="_blank" rel="noopener noreferrer nofollow" class="story-link">${label}</a>`;
     });
+}
+
+export function renderTable(tableMarkdown: string): string {
+  const lines = tableMarkdown.trim().split("\n");
+  if (lines.length < 2) return "";
+  
+  const headers = lines[0].split("|").map(s => s.trim()).filter(Boolean);
+  // Skip separator line (lines[1])
+  const rows = lines.slice(2).map(line => {
+    return line.split("|").map(s => s.trim()).filter(Boolean);
+  });
+  
+  let html = `<div class="overflow-x-auto my-6 border border-border/80 rounded-xl bg-white"><table class="w-full text-sm text-left border-collapse">`;
+  
+  // Header
+  html += `<thead><tr class="border-b border-border/80 bg-secondary/3">`;
+  headers.forEach(h => {
+    html += `<th class="px-4 py-3 font-semibold text-foreground text-xs uppercase tracking-wider">${h}</th>`;
+  });
+  html += `</tr></thead>`;
+  
+  // Body
+  html += `<tbody class="divide-y divide-border/60">`;
+  rows.forEach(row => {
+    html += `<tr class="hover:bg-secondary/1">`;
+    row.forEach(cell => {
+      html += `<td class="px-4 py-3 text-secondary">${renderInline(cell)}</td>`;
+    });
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div>`;
+  
+  return html;
 }
 
 /* ── Tiptap ⇆ markdown bridge ────────────────────────────────────────────

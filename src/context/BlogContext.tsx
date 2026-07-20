@@ -50,7 +50,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
       try {
         const metaRef = doc(db, META_DOC);
         const metaSnap = await getDoc(metaRef);
-        if (!metaSnap.exists() || metaSnap.data()?.version !== "v4") {
+        if (!metaSnap.exists() || metaSnap.data()?.version !== "v8") {
           // seed articles
           const writes = seedArticles.map((a) =>
             setDoc(doc(db, ARTICLES_COL, a.id), a)
@@ -69,7 +69,7 @@ export function BlogProvider({ children }: { children: React.ReactNode }) {
           });
           await Promise.all(catWrites);
 
-          await setDoc(metaRef, { seeded: true, version: "v4" });
+          await setDoc(metaRef, { seeded: true, version: "v8" });
         }
       } catch (err) {
         console.error("Seed error:", err);

@@ -119,7 +119,7 @@ export default function Home() {
             )}
             {user && user.role !== "admin" && (
               <Link
-                href="/dashboard"
+                href={`/profile/${user.id}?tab=dashboard`}
                 className="flex items-center gap-1.5 text-secondary hover:text-foreground transition-colors"
               >
                 <LayoutDashboard size={16} />
@@ -129,7 +129,7 @@ export default function Home() {
             {user ? (
               <div className="flex items-center gap-3">
                 <Link
-                  href={user.role === "admin" ? "/admin/blogs" : "/dashboard"}
+                  href={user.role === "admin" ? "/admin/blogs" : `/profile/${user.id}`}
                   className="bg-button text-white px-5 py-2 rounded-full hover:bg-button/90 transition-colors font-medium text-sm flex items-center justify-center"
                 >
                   {user.firstName}
@@ -203,25 +203,29 @@ export default function Home() {
 
           {/* ── Featured hero (only on "All" with no search) ── */}
           {showFeatured && (
-            <Link href={`/article/${featured.id}`} className="block group mb-12">
-              <div className="rounded-2xl border border-border p-8 hover:border-foreground/20 transition-colors">
+            <div className="block mb-12">
+              <div className="rounded-2xl border border-border p-8 hover:border-foreground/20 transition-colors group">
                 <div className="flex items-center gap-2 mb-5 text-sm">
-                  <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[11px] font-bold text-accent">
-                    {featured.author[0]?.toUpperCase()}
-                  </div>
-                  <span className="font-medium">{featured.author}</span>
+                  <Link href={`/profile/${featured.authorId}`} className="flex items-center gap-2 hover:opacity-85 transition-opacity">
+                    <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[11px] font-bold text-accent">
+                      {featured.author[0]?.toUpperCase()}
+                    </div>
+                    <span className="font-medium text-foreground hover:text-accent transition-colors">{featured.author}</span>
+                  </Link>
                   <span className="text-secondary">·</span>
                   <span className="text-secondary">{featured.date}</span>
                   <span className="ml-auto bg-accent/10 text-accent text-xs font-semibold px-3 py-0.5 rounded-full">
                     Featured
                   </span>
                 </div>
-                <h2 className="serif text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-3 group-hover:underline underline-offset-4 decoration-1">
-                  {featured.title}
-                </h2>
-                <p className="text-secondary text-lg leading-relaxed mb-6 line-clamp-3">
-                  {featured.description}
-                </p>
+                <Link href={`/article/${featured.id}`} className="block">
+                  <h2 className="serif text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-3 group-hover:underline underline-offset-4 decoration-1">
+                    {featured.title}
+                  </h2>
+                  <p className="text-secondary text-lg leading-relaxed mb-6 line-clamp-3">
+                    {featured.description}
+                  </p>
+                </Link>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="bg-secondary/8 px-3 py-1 rounded-full text-xs font-medium text-secondary">
@@ -250,12 +254,12 @@ export default function Home() {
                       <Eye size={12} /> {formatNum(featured.views ?? 0)}
                     </span>
                   </div>
-                  <span className="text-sm text-accent font-medium flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
+                  <Link href={`/article/${featured.id}`} className="text-sm text-accent font-medium flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
                     Read <ArrowRight size={14} />
-                  </span>
+                  </Link>
                 </div>
               </div>
-            </Link>
+            </div>
           )}
 
           {/* ── Category-wise sections ── */}
@@ -284,14 +288,14 @@ export default function Home() {
                     <div className="flex gap-5 items-start">
                       <div className="flex-1 min-w-0">
                         {/* Author */}
-                        <div className="flex items-center gap-2 mb-2.5 text-sm">
+                        <Link href={`/profile/${article.authorId}`} className="flex items-center gap-2 mb-2.5 text-sm hover:opacity-85 transition-opacity">
                           <div className="w-5 h-5 rounded-full bg-secondary/15 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
                             {article.author[0]?.toUpperCase()}
                           </div>
-                          <span className="font-medium text-sm">{article.author}</span>
+                          <span className="font-medium text-sm text-foreground hover:text-accent transition-colors">{article.author}</span>
                           <span className="text-secondary/60">·</span>
                           <span className="text-secondary text-xs">{article.date}</span>
-                        </div>
+                        </Link>
 
                         {/* Title + description */}
                         <Link href={`/article/${article.id}`} className="block">

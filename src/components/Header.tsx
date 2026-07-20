@@ -155,7 +155,7 @@ export default function Header() {
 
                     {user.role === "writer" && (
                       <Link
-                        href="/dashboard"
+                        href={`/profile/${user.id}?tab=dashboard`}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-surface transition-colors"
                         onClick={() => setProfileOpen(false)}
                       >
@@ -253,7 +253,7 @@ export default function Header() {
                   Write a story
                 </Link>
                 {user.role === "writer" && (
-                  <Link href="/dashboard" className="block px-3 py-2 text-sm font-medium" onClick={() => setMenuOpen(false)}>
+                  <Link href={`/profile/${user.id}?tab=dashboard`} className="block px-3 py-2 text-sm font-medium" onClick={() => setMenuOpen(false)}>
                     Dashboard
                   </Link>
                 )}

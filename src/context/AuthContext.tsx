@@ -2,10 +2,20 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@/data/dummy";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import {
-  collection, doc, getDoc, setDoc, onSnapshot, updateDoc
+  collection, doc, getDoc, setDoc, onSnapshot, updateDoc,
+  deleteDoc, query, where, getDocs, writeBatch, increment
 } from "firebase/firestore";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  signInWithPopup,
+  GoogleAuthProvider,
+  sendEmailVerification,
+  onAuthStateChanged
+} from "firebase/auth";
 
 interface SignupData {
   firstName: string;
@@ -23,17 +33,18 @@ interface AuthContextValue {
   user: User | null;
   users: User[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signup: (data: SignupData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   toggleUserActive: (userId: string) => void;
   toggleSaveArticle: (articleId: string) => void;
   toggleLikeArticle: (articleId: string) => boolean;
+  toggleFollowUser: (targetUserId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const SESSION_KEY = "zeni_session";
 const USERS_COL = "users";
 
 const ADMIN_USER: User = {
@@ -44,6 +55,7 @@ const ADMIN_USER: User = {
   role: "admin",
   followers: 0,
   following: 0,
+  followingUsers: [],
   joinDate: "Jan 1, 2026",
   isActive: true,
   bio: "Platform administrator",
@@ -58,8 +70,9 @@ const SEED_USERS: User[] = [
     email: "shreyas@example.com",
     country: "India",
     role: "writer",
-    followers: 12400,
-    following: 89,
+    followers: 0,
+    following: 0,
+    followingUsers: [],
     joinDate: "Jan 15, 2026",
     isActive: true,
     bio: "Tech writer & AI enthusiast. Writing about the future of technology.",
@@ -72,8 +85,9 @@ const SEED_USERS: User[] = [
     email: "priya@example.com",
     country: "India",
     role: "writer",
-    followers: 8200,
-    following: 54,
+    followers: 0,
+    following: 0,
+    followingUsers: [],
     joinDate: "Feb 3, 2026",
     isActive: true,
     bio: "Finance expert & startup advisor",
@@ -86,8 +100,9 @@ const SEED_USERS: User[] = [
     email: "arjun@example.com",
     country: "India",
     role: "writer",
-    followers: 5600,
-    following: 120,
+    followers: 0,
+    following: 0,
+    followingUsers: [],
     joinDate: "Feb 20, 2026",
     isActive: true,
     bio: "Product designer & UX researcher",
@@ -100,31 +115,54 @@ const SEED_USERS: User[] = [
     email: "kavya@example.com",
     country: "India",
     role: "writer",
-    followers: 3800,
-    following: 67,
+    followers: 0,
+    following: 0,
+    followingUsers: [],
     joinDate: "Mar 5, 2026",
     isActive: true,
     bio: "Health & wellness writer",
     about: "Sharing evidence-based health tips and wellness strategies. Certified nutritionist.",
   },
+  {
+    id: "writer-nextzeni",
+    firstName: "NextZeni",
+    lastName: "Team",
+    email: "yournextzeni@gmail.com",
+    country: "India",
+    role: "writer",
+    followers: 0,
+    following: 0,
+    followingUsers: [],
+    joinDate: "Jul 21, 2026",
+    isActive: true,
+    bio: "Sports analyst & editor at NextZeni",
+    about: "Covering the global dynamics of football, business model economics, and sports cultures.",
+  },
 ];
+
+const DEMO_EMAILS = [
+  "admin@nextzeni.com",
+  "shreyas@example.com",
+  "priya@example.com",
+  "arjun@example.com",
+  "kavya@example.com"
+];
+
+function isDemoUser(email?: string | null): boolean {
+  if (!email) return false;
+  return DEMO_EMAILS.includes(email.toLowerCase());
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-
-  // Initialize sessionId from localStorage on mount
-  useEffect(() => {
-    setSessionId(localStorage.getItem(SESSION_KEY));
-  }, []);
 
   // Seed default users in Firestore if needed
   useEffect(() => {
     async function seedUsersIfNeeded() {
       try {
-        const metaRef = doc(db, "meta/users_seed_v2");
+        const metaRef = doc(db, "meta/users_seed_v4");
         const metaSnap = await getDoc(metaRef);
         if (!metaSnap.exists()) {
           // seed admin
@@ -151,34 +189,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     seedUsersIfNeeded();
   }, []);
 
-  // Real-time listener for current session user
+  // Real-time listener for current Firebase Auth user
   useEffect(() => {
-    if (!sessionId) {
-      setUser(null);
-      setReady(true);
-      return;
-    }
+    let docUnsub: (() => void) | null = null;
 
-    const unsub = onSnapshot(
-      doc(db, USERS_COL, sessionId),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setUser({ id: docSnap.id, ...data } as User);
-        } else {
+    const authUnsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (docUnsub) {
+        docUnsub();
+        docUnsub = null;
+      }
+
+      if (firebaseUser) {
+        // Block unverified email users (except demo users)
+        if (!firebaseUser.emailVerified && !isDemoUser(firebaseUser.email)) {
+          await signOut(auth);
           setUser(null);
-          localStorage.removeItem(SESSION_KEY);
-          setSessionId(null);
+          setReady(true);
+          return;
         }
-        setReady(true);
-      },
-      (err) => {
-        console.error("Session user fetch error:", err);
+
+        // Setup real-time listener for current user's document
+        const userDocId = firebaseUser.email === "yournextzeni@gmail.com" ? "writer-nextzeni" : firebaseUser.uid;
+        docUnsub = onSnapshot(
+          doc(db, USERS_COL, userDocId),
+          (docSnap) => {
+            if (docSnap.exists()) {
+              setUser({ id: docSnap.id, ...docSnap.data() } as User);
+            } else {
+              setUser(null);
+            }
+            setReady(true);
+          },
+          (err) => {
+            console.error("User doc fetch error:", err);
+            setReady(true);
+          }
+        );
+      } else {
+        setUser(null);
         setReady(true);
       }
-    );
-    return unsub;
-  }, [sessionId]);
+    });
+
+    return () => {
+      authUnsub();
+      if (docUnsub) docUnsub();
+    };
+  }, []);
 
   // Real-time listener for all users
   useEffect(() => {
@@ -190,33 +247,182 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Find user by email in current users state
-      const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-      if (!found) {
-        return { success: false, error: "No account found with this email." };
-      }
-      
-      // Retrieve the doc from db to verify password
-      const userSnap = await getDoc(doc(db, USERS_COL, found.id));
-      if (!userSnap.exists()) {
-        return { success: false, error: "Account not found." };
-      }
-      
-      const userData = userSnap.data();
-      if (!userData.isActive) {
-        return { success: false, error: "Your account has been deactivated by admin." };
-      }
-      
-      if (userData.password !== password) {
-        return { success: false, error: "Incorrect password." };
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } catch (authErr: any) {
+        // Fallback migration for demo users not in Firebase Auth
+        if (
+          authErr.code === "auth/user-not-found" ||
+          authErr.code === "auth/invalid-credential" ||
+          authErr.code === "auth/invalid-email"
+        ) {
+          const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+          if (found) {
+            const userSnap = await getDoc(doc(db, USERS_COL, found.id));
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
+              if (userData.password === password) {
+                // Register the user in Firebase Auth
+                try {
+                  const newCred = await createUserWithEmailAndPassword(auth, email, password);
+                  const uid = newCred.user.uid;
+
+                  // Create user document under the new UID
+                  await setDoc(doc(db, USERS_COL, uid), {
+                    ...userData,
+                    id: uid,
+                  });
+
+                  // Update articles reference
+                  const articlesQuery = query(
+                    collection(db, "articles"),
+                    where("authorId", "==", found.id)
+                  );
+                  const articlesSnap = await getDocs(articlesQuery);
+                  const batch = writeBatch(db);
+                  articlesSnap.forEach((docSnap) => {
+                    batch.update(docSnap.ref, { authorId: uid });
+                  });
+                  await batch.commit();
+
+                  // Update comments reference
+                  const commentsQuery = query(
+                    collection(db, "comments"),
+                    where("authorId", "==", found.id)
+                  );
+                  const commentsSnap = await getDocs(commentsQuery);
+                  const commentsBatch = writeBatch(db);
+                  commentsSnap.forEach((docSnap) => {
+                    commentsBatch.update(docSnap.ref, { authorId: uid });
+                  });
+                  await commentsBatch.commit();
+
+                  // Delete the old custom ID document
+                  await deleteDoc(doc(db, USERS_COL, found.id));
+
+                  // Sign in again with new credentials to ensure state is synchronized
+                  userCredential = await signInWithEmailAndPassword(auth, email, password);
+                } catch (migrateErr) {
+                  console.error("Failed to migrate demo account to Firebase Auth:", migrateErr);
+                  throw authErr;
+                }
+              } else {
+                return { success: false, error: "Incorrect password." };
+              }
+            } else {
+              return { success: false, error: "Account not found." };
+            }
+          } else {
+            throw authErr;
+          }
+        } else {
+          throw authErr;
+        }
       }
 
-      localStorage.setItem(SESSION_KEY, found.id);
-      setSessionId(found.id);
+      const firebaseUser = userCredential.user;
+
+      // Verify email if not a demo account
+      if (!firebaseUser.emailVerified && !isDemoUser(firebaseUser.email)) {
+        await sendEmailVerification(firebaseUser);
+        await signOut(auth);
+        return {
+          success: false,
+          error: "Please verify your email address. A new verification link has been sent to your inbox."
+        };
+      }
+
+      // Check Firestore user doc
+      const userSnap = await getDoc(doc(db, USERS_COL, firebaseUser.uid));
+      if (!userSnap.exists()) {
+        const names = firebaseUser.displayName ? firebaseUser.displayName.split(" ") : ["User", ""];
+        await setDoc(doc(db, USERS_COL, firebaseUser.uid), {
+          firstName: names[0],
+          lastName: names.slice(1).join(" ") || "",
+          email: firebaseUser.email || "",
+          role: "reader",
+          followers: 0,
+          following: 0,
+          followingUsers: [],
+          joinDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          isActive: true,
+          savedArticles: [],
+          likedArticles: [],
+        });
+      } else {
+        const userData = userSnap.data();
+        if (!userData.isActive) {
+          await signOut(auth);
+          return { success: false, error: "Your account has been deactivated by admin." };
+        }
+      }
+
       return { success: true };
-    } catch (err) {
+    } catch (err: any) {
       console.error("Login error:", err);
-      return { success: false, error: "An error occurred during sign in." };
+      let msg = "An error occurred during sign in.";
+      if (
+        err.code === "auth/user-not-found" ||
+        err.code === "auth/invalid-credential" ||
+        err.code === "auth/wrong-password"
+      ) {
+        msg = "Incorrect email or password.";
+      } else if (err.code === "auth/invalid-email") {
+        msg = "The email address is invalid.";
+      } else if (err.code === "auth/user-disabled") {
+        msg = "This account has been disabled.";
+      }
+      return { success: false, error: msg };
+    }
+  }
+
+  async function loginWithGoogle(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const firebaseUser = userCredential.user;
+
+      // Check if Firestore document exists
+      const userDocId = firebaseUser.email === "yournextzeni@gmail.com" ? "writer-nextzeni" : firebaseUser.uid;
+      const userDocRef = doc(db, USERS_COL, userDocId);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        const names = firebaseUser.displayName ? firebaseUser.displayName.split(" ") : ["Google", "User"];
+        const firstName = names[0];
+        const lastName = names.slice(1).join(" ") || "";
+        const isNextZeni = firebaseUser.email === "yournextzeni@gmail.com";
+        const newUserDoc = {
+          firstName: isNextZeni ? "NextZeni" : firstName,
+          lastName: isNextZeni ? "Team" : lastName,
+          email: firebaseUser.email || "",
+          mobile: "",
+          country: "India",
+          role: isNextZeni ? "writer" : "reader",
+          bio: isNextZeni ? "Sports analyst & editor at NextZeni" : "Reader logged in via Google",
+          about: isNextZeni ? "Covering the global dynamics of football, business model economics, and sports cultures." : "",
+          followers: 0,
+          following: 0,
+          followingUsers: [],
+          joinDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          isActive: true,
+          savedArticles: [],
+          likedArticles: [],
+        };
+        await setDoc(userDocRef, newUserDoc);
+      } else {
+        const userData = userDocSnap.data();
+        if (!userData.isActive) {
+          await signOut(auth);
+          return { success: false, error: "Your account has been deactivated by admin." };
+        }
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error("Google login error:", err);
+      return { success: false, error: err.message || "Failed to sign in with Google." };
     }
   }
 
@@ -227,7 +433,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: "An account with this email already exists." };
       }
 
-      const newId = `user-${Date.now()}`;
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const firebaseUser = userCredential.user;
+
+      await sendEmailVerification(firebaseUser);
+
       const newUserDoc = {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -235,10 +445,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         mobile: data.mobile || "",
         country: data.country || "",
         role: data.role,
-        bio: data.bio || "",
+        bio: data.bio || (data.role === "writer" ? "Aspiring tech writer" : "Avid reader"),
         about: data.about || "",
         followers: 0,
         following: 0,
+        followingUsers: [],
         joinDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         isActive: true,
         password: data.password,
@@ -246,26 +457,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         likedArticles: [],
       };
 
-      await setDoc(doc(db, USERS_COL, newId), newUserDoc);
-      localStorage.setItem(SESSION_KEY, newId);
-      setSessionId(newId);
+      const userDocId = data.email.toLowerCase() === "yournextzeni@gmail.com" ? "writer-nextzeni" : firebaseUser.uid;
+      await setDoc(doc(db, USERS_COL, userDocId), newUserDoc);
+
+      await signOut(auth);
+
       return { success: true };
-    } catch (err) {
+    } catch (err: any) {
       console.error("Signup error:", err);
-      return { success: false, error: "An error occurred during account creation." };
+      let msg = "An error occurred during account creation.";
+      if (err.code === "auth/email-already-in-use") {
+        msg = "An account with this email already exists.";
+      } else if (err.code === "auth/weak-password") {
+        msg = "The password is too weak. Please use a stronger password.";
+      } else if (err.code === "auth/invalid-email") {
+        msg = "The email address is invalid.";
+      }
+      return { success: false, error: msg };
     }
   }
 
-  function logout() {
-    localStorage.removeItem(SESSION_KEY);
-    setSessionId(null);
-    setUser(null);
+  async function logout() {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   }
 
   async function updateUser(updates: Partial<User>) {
-    if (!sessionId) return;
+    if (!user) return;
     try {
-      await updateDoc(doc(db, USERS_COL, sessionId), updates);
+      await updateDoc(doc(db, USERS_COL, user.id), updates);
     } catch (err) {
       console.error("Update user error:", err);
     }
@@ -284,7 +507,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function toggleSaveArticle(articleId: string) {
-    if (!user || !sessionId) return;
+    if (!user) return;
     const saved = user.savedArticles || [];
     const updatedSaved = saved.includes(articleId)
       ? saved.filter((id) => id !== articleId)
@@ -293,7 +516,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function toggleLikeArticle(articleId: string): boolean {
-    if (!user || !sessionId) return false;
+    if (!user) return false;
     const liked = user.likedArticles || [];
     const isLiked = liked.includes(articleId);
     const updatedLiked = isLiked
@@ -303,10 +526,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return !isLiked;
   }
 
+  async function toggleFollowUser(targetUserId: string) {
+    if (!user) return;
+    try {
+      const followingList = user.followingUsers || [];
+      const isCurrentlyFollowing = followingList.includes(targetUserId);
+      const newFollowingList = isCurrentlyFollowing
+        ? followingList.filter((id) => id !== targetUserId)
+        : [...followingList, targetUserId];
+
+      // Update current user doc
+      await updateDoc(doc(db, USERS_COL, user.id), {
+        followingUsers: newFollowingList,
+        following: increment(isCurrentlyFollowing ? -1 : 1),
+      });
+
+      // Update target user doc
+      await updateDoc(doc(db, USERS_COL, targetUserId), {
+        followers: increment(isCurrentlyFollowing ? -1 : 1),
+      });
+    } catch (err) {
+      console.error("Error toggling follow:", err);
+    }
+  }
+
   if (!ready) return null;
 
   return (
-    <AuthContext.Provider value={{ user, users, login, signup, logout, updateUser, toggleUserActive, toggleSaveArticle, toggleLikeArticle }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        users,
+        login,
+        loginWithGoogle,
+        signup,
+        logout,
+        updateUser,
+        toggleUserActive,
+        toggleSaveArticle,
+        toggleLikeArticle,
+        toggleFollowUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
