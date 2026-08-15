@@ -64,7 +64,7 @@ export default function SignupPage() {
         setTimeout(() => {
           router.push("/");
         }, 800);
-      } else {
+      } else if (!res.cancelled) {
         setError(res.error ?? "Failed to sign up with Google.");
       }
     } catch (err) {

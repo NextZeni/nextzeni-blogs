@@ -41,8 +41,11 @@ export interface Article {
   responses: number;
   content: string;
   coverImage?: string;
+  /** SEO-only fields — never rendered in the story, only in <head>. */
   seoKeywords?: string[];
   tags?: string[];
+  metaTitle?: string;
+  metaDescription?: string;
   views: number;
   status: "published" | "draft" | "pending" | "rejected";
   rejectionReason?: string;
@@ -134,15 +137,60 @@ export const CATEGORY_GRADIENT: Record<string, string> = {
 };
 
 export interface ContentBlock {
-  type: "h2" | "h3" | "paragraph" | "quote" | "code" | "image" | "table";
+  type: "h2" | "h3" | "paragraph" | "quote" | "code" | "image" | "table" | "list";
   text: string;
   id: string;
   src?: string;
   alt?: string;
+  /** Image caption, from the markdown title slot: ![alt](src "caption") */
+  caption?: string;
+  /** For type "list": one entry per item, each still holding inline markdown. */
+  items?: string[];
+  /** For type "list": ordered (1.) vs bullet (-). */
+  ordered?: boolean;
 }
 
-// A markdown line that is exactly an image: ![alt](url)
-const IMAGE_LINE = /^!\[([^\]]*)\]\(([^)]+)\)$/;
+// A markdown line that is exactly an image, with an optional "caption":
+//   ![alt](url)  |  ![alt](url "caption")
+const IMAGE_LINE = /^!\[([^\]]*)\]\(\s*([^)\s"]+)(?:\s+"([^"]*)")?\s*\)$/;
+
+// Highlight colours an author can pick from. Keys appear in the markdown
+// (`==green:text==`), values are the classes the reader paints with.
+export const HIGHLIGHT_COLORS = {
+  yellow: "bg-yellow-200/70",
+  green: "bg-green-200/70",
+  blue: "bg-sky-200/70",
+  pink: "bg-pink-200/70",
+} as const;
+
+export type HighlightColor = keyof typeof HIGHLIGHT_COLORS;
+
+// Curated text styles, offered instead of a raw font picker so articles stay
+// on-brand. Keys appear in the markdown (`[[lede|text]]`).
+export const TEXT_STYLES = {
+  lede: "text-xl leading-relaxed text-foreground/90",
+  serif: "serif italic",
+  small: "text-sm text-secondary",
+} as const;
+
+export type TextStyleName = keyof typeof TEXT_STYLES;
+
+// Text colours an author can pick from. Keys appear in the markdown
+// (`{{red|text}}`); a fixed palette keeps articles on-brand and means the
+// class can never be author-controlled.
+export const TEXT_COLORS = {
+  red: "text-red-600",
+  orange: "text-orange-600",
+  green: "text-green-700",
+  blue: "text-blue-700",
+  purple: "text-purple-700",
+  gray: "text-secondary",
+} as const;
+
+export type TextColorName = keyof typeof TEXT_COLORS;
+
+const BULLET_LINE = /^[-*]\s+(.*)$/;
+const ORDERED_LINE = /^\d+[.)]\s+(.*)$/;
 
 export function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-");
@@ -156,6 +204,8 @@ export function parseContent(raw: string): ContentBlock[] {
   let codeLines: string[] = [];
   let inTable = false;
   let tableLines: string[] = [];
+  let listItems: string[] = [];
+  let listOrdered = false;
 
   function flushPara() {
     const text = paraLines.join(" ").trim();
@@ -170,9 +220,17 @@ export function parseContent(raw: string): ContentBlock[] {
     inTable = false;
   }
 
+  function flushList() {
+    if (listItems.length) {
+      blocks.push({ type: "list", text: listItems.join("\n"), id: "", items: listItems, ordered: listOrdered });
+    }
+    listItems = [];
+  }
+
   for (const line of lines) {
     if (line.startsWith("```")) {
       flushPara();
+      flushList();
       flushTable();
       if (inCode) {
         blocks.push({ type: "code", text: codeLines.join("\n"), id: "" });
@@ -185,33 +243,53 @@ export function parseContent(raw: string): ContentBlock[] {
       codeLines.push(line);
     } else if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
       flushPara();
+      flushList();
       inTable = true;
       tableLines.push(line.trim());
     } else {
       flushTable();
+      const trimmed = line.trim();
+      const bullet = trimmed.match(BULLET_LINE);
+      const ordered = trimmed.match(ORDERED_LINE);
+
       if (line.startsWith("## ")) {
         flushPara();
+        flushList();
         const text = line.slice(3).trim();
         blocks.push({ type: "h2", text, id: slugify(text) });
       } else if (line.startsWith("### ")) {
         flushPara();
+        flushList();
         const text = line.slice(4).trim();
         blocks.push({ type: "h3", text, id: slugify(text) });
       } else if (line.startsWith("> ")) {
         flushPara();
+        flushList();
         blocks.push({ type: "quote", text: line.slice(2).trim(), id: "" });
-      } else if (IMAGE_LINE.test(line.trim())) {
+      } else if (IMAGE_LINE.test(trimmed)) {
         flushPara();
-        const [, alt, src] = line.trim().match(IMAGE_LINE)!;
-        blocks.push({ type: "image", text: alt, id: "", src, alt });
-      } else if (line.trim() === "") {
+        flushList();
+        const [, alt, src, caption] = trimmed.match(IMAGE_LINE)!;
+        blocks.push({ type: "image", text: alt, id: "", src, alt, caption: caption || undefined });
+      } else if (bullet || ordered) {
+        // A run of consecutive item lines becomes one list block. Switching
+        // marker style (- → 1.) starts a new list.
         flushPara();
+        const isOrdered = Boolean(ordered);
+        if (listItems.length && listOrdered !== isOrdered) flushList();
+        listOrdered = isOrdered;
+        listItems.push((bullet ?? ordered)![1].trim());
+      } else if (trimmed === "") {
+        flushPara();
+        flushList();
       } else {
+        flushList();
         paraLines.push(line);
       }
     }
   }
   flushPara();
+  flushList();
   flushTable();
   return blocks;
 }
@@ -235,6 +313,25 @@ export function renderInline(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     .replace(/`(.+?)`/g, '<code class="inline-code">$1</code>')
+    // Underline: __text__
+    .replace(/__(.+?)__/g, '<span class="story-underline">$1</span>')
+    // Curated text style: [[lede|text]] — only whitelisted names match, so the
+    // class can never come from author input.
+    .replace(
+      new RegExp(`\\[\\[(${Object.keys(TEXT_STYLES).join("|")})\\|(.+?)\\]\\]`, "g"),
+      (_m, name: TextStyleName, body: string) => `<span class="${TEXT_STYLES[name]}">${body}</span>`
+    )
+    // Text colour: {{red|text}}. Same whitelist guarantee.
+    .replace(
+      new RegExp(`\\{\\{(${Object.keys(TEXT_COLORS).join("|")})\\|(.+?)\\}\\}`, "g"),
+      (_m, name: TextColorName, body: string) => `<span class="${TEXT_COLORS[name]}">${body}</span>`
+    )
+    // Highlight: ==text== (yellow) or ==green:text==. Same whitelist guarantee.
+    .replace(
+      new RegExp(`==(?:(${Object.keys(HIGHLIGHT_COLORS).join("|")}):)?(.+?)==`, "g"),
+      (_m, color: HighlightColor | undefined, body: string) =>
+        `<mark class="${HIGHLIGHT_COLORS[color ?? "yellow"]} rounded px-0.5">${body}</mark>`
+    )
     // Links: [text](url) — the (?<!!) skips image syntax ![alt](url).
     .replace(/(?<!!)\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, url) => {
       const href = safeHref(url);
@@ -247,11 +344,9 @@ export function renderTable(tableMarkdown: string): string {
   const lines = tableMarkdown.trim().split("\n");
   if (lines.length < 2) return "";
   
-  const headers = lines[0].split("|").map(s => s.trim()).filter(Boolean);
+  const headers = splitTableRow(lines[0]);
   // Skip separator line (lines[1])
-  const rows = lines.slice(2).map(line => {
-    return line.split("|").map(s => s.trim()).filter(Boolean);
-  });
+  const rows = lines.slice(2).map(splitTableRow);
   
   let html = `<div class="overflow-x-auto my-6 border border-border/80 rounded-xl bg-white"><table class="w-full text-sm text-left border-collapse">`;
   
@@ -282,32 +377,102 @@ export function renderTable(tableMarkdown: string): string {
    existing articles are untouched. These are pure functions — no Tiptap
    import — so they're framework-agnostic and easy to test.                  */
 
-export interface TiptapMark { type: string; attrs?: { href?: string } }
+export interface TiptapMark {
+  type: string;
+  attrs?: { href?: string; color?: string; styleName?: string; colorName?: string };
+}
 export interface TiptapNode {
   type: string;
   text?: string;
-  attrs?: { level?: number; src?: string; alt?: string };
+  attrs?: { level?: number; src?: string; alt?: string; title?: string };
   marks?: TiptapMark[];
   content?: TiptapNode[];
 }
 export interface TiptapDoc { type: "doc"; content?: TiptapNode[] }
 
-// Inline nodes → markdown (`code`, **bold**, *italic*, [link](url)).
-function serializeInline(nodes?: TiptapNode[]): string {
-  return (nodes ?? [])
-    .map((n) => {
-      if (n.type === "hardBreak") return "\n";
-      let t = n.text ?? "";
-      const marks = n.marks ?? [];
-      const has = (type: string) => marks.some((m) => m.type === type);
-      if (has("code")) t = "`" + t + "`";
-      if (has("bold")) t = "**" + t + "**";
-      if (has("italic")) t = "*" + t + "*";
-      const link = marks.find((m) => m.type === "link");
-      if (link?.attrs?.href) t = "[" + t + "](" + link.attrs.href + ")"; // link wraps outermost
-      return t;
-    })
-    .join("");
+// Tiptap's Highlight stores a CSS colour; map it back to our palette name.
+function highlightName(mark?: TiptapMark): HighlightColor {
+  const raw = (mark?.attrs?.color ?? "").toLowerCase();
+  const hit = (Object.keys(HIGHLIGHT_COLORS) as HighlightColor[]).find((c) => raw.includes(c));
+  return hit ?? "yellow";
+}
+
+// Marks that enclose a run of text, outermost first. These are emitted once
+// around a whole run rather than per text node, so [link](url) with a bold word
+// inside stays one link instead of splitting into several.
+const WRAPPER_MARKS = ["link", "highlight", "zeniTextStyle", "zeniTextColor"] as const;
+
+// Identifies a wrapper mark so consecutive nodes sharing it can be grouped.
+function wrapperKey(mark?: TiptapMark): string | null {
+  if (!mark) return null;
+  if (mark.type === "link") return "link:" + (mark.attrs?.href ?? "");
+  if (mark.type === "highlight") return "highlight:" + highlightName(mark);
+  if (mark.type === "zeniTextColor") return "color:" + (mark.attrs?.colorName ?? "");
+  return "style:" + (mark.attrs?.styleName ?? "");
+}
+
+// The character-level marks, applied innermost.
+function serializeLeaf(node: TiptapNode): string {
+  if (node.type === "hardBreak") return "\n";
+  let t = node.text ?? "";
+  if (!t) return "";
+  const has = (type: string) => (node.marks ?? []).some((m) => m.type === type);
+  if (has("code")) t = "`" + t + "`";
+  if (has("bold")) t = "**" + t + "**";
+  if (has("italic")) t = "*" + t + "*";
+  if (has("underline")) t = "__" + t + "__";
+  return t;
+}
+
+// Inline nodes → markdown (`code`, **bold**, *italic*, __underline__,
+// ==highlight==, [[style|text]], [link](url)).
+function serializeInline(nodes?: TiptapNode[], depth = 0): string {
+  const list = nodes ?? [];
+  if (depth >= WRAPPER_MARKS.length) return list.map(serializeLeaf).join("");
+
+  const type = WRAPPER_MARKS[depth];
+  const markOf = (n: TiptapNode) => (n.marks ?? []).find((m) => m.type === type);
+
+  let out = "";
+  let i = 0;
+  while (i < list.length) {
+    const mark = markOf(list[i]);
+    const key = wrapperKey(mark);
+    // Extend over every following node with the same mark — including a run of
+    // nodes that all lack it, so the deeper levels still see their neighbours.
+    let j = i + 1;
+    while (j < list.length && wrapperKey(markOf(list[j])) === key) j++;
+
+    if (!key) {
+      out += serializeInline(list.slice(i, j), depth + 1);
+      i = j;
+      continue;
+    }
+    const inner = serializeInline(list.slice(i, j), depth + 1);
+
+    if (type === "link") out += "[" + inner + "](" + (mark!.attrs?.href ?? "") + ")";
+    else if (type === "highlight") {
+      const color = highlightName(mark);
+      out += color === "yellow" ? "==" + inner + "==" : "==" + color + ":" + inner + "==";
+    } else if (type === "zeniTextColor") {
+      const name = mark!.attrs?.colorName;
+      out += name && name in TEXT_COLORS ? "{{" + name + "|" + inner + "}}" : inner;
+    } else if (mark!.attrs?.styleName && mark!.attrs.styleName in TEXT_STYLES) {
+      out += "[[" + mark!.attrs.styleName + "|" + inner + "]]";
+    } else out += inner;
+
+    i = j;
+  }
+  return out;
+}
+
+// One table row of Tiptap cells → `| a | b |`. Pipes inside a cell are escaped
+// so they don't split the row when it's read back.
+function serializeRow(row: TiptapNode): string {
+  const cells = (row.content ?? []).map((cell) =>
+    (cell.content ?? []).map((p) => serializeInline(p.content)).join(" ").replace(/\|/g, "\\|").trim()
+  );
+  return "| " + cells.join(" | ") + " |";
 }
 
 // Editor JSON (editor.getJSON()) → the markdown format parseContent() expects.
@@ -324,9 +489,31 @@ export function serializeToMarkdown(doc: TiptapDoc): string {
       case "codeBlock":
         out.push("```\n" + serializeInline(node.content) + "\n```");
         break;
-      case "image":
-        out.push("![" + (node.attrs?.alt ?? "") + "](" + (node.attrs?.src ?? "") + ")");
+      case "image": {
+        const caption = (node.attrs?.title ?? "").replace(/"/g, "'").trim();
+        const tail = caption ? ' "' + caption + '"' : "";
+        out.push("![" + (node.attrs?.alt ?? "") + "](" + (node.attrs?.src ?? "") + tail + ")");
         break;
+      }
+      case "bulletList":
+      case "orderedList": {
+        const ordered = node.type === "orderedList";
+        const items = (node.content ?? []).map((li, i) => {
+          const body = (li.content ?? []).map((p) => serializeInline(p.content)).join(" ").trim();
+          return (ordered ? `${i + 1}. ` : "- ") + body;
+        });
+        out.push(items.join("\n"));
+        break;
+      }
+      case "table": {
+        const rows = node.content ?? [];
+        if (rows.length === 0) break;
+        const colCount = (rows[0].content ?? []).length;
+        const lines = [serializeRow(rows[0]), "| " + Array(colCount).fill("---").join(" | ") + " |"];
+        for (const row of rows.slice(1)) lines.push(serializeRow(row));
+        out.push(lines.join("\n"));
+        break;
+      }
       default: // paragraph & anything else
         out.push(serializeInline(node.content));
     }
@@ -334,26 +521,68 @@ export function serializeToMarkdown(doc: TiptapDoc): string {
   return out.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// Split a markdown string into inline text nodes with marks.
+// Split a markdown string into inline text nodes with marks. Recursive, so a
+// combination like ==green:**bold**== keeps both marks.
 function parseInline(text: string): TiptapNode[] {
+  const styleNames = Object.keys(TEXT_STYLES).join("|");
+  const markerNames = Object.keys(HIGHLIGHT_COLORS).join("|");
+  const inkNames = Object.keys(TEXT_COLORS).join("|");
+  // Alternation order matters: the bracket forms are tried before the
+  // single-character ones so [[style|x]] isn't mistaken for a link.
+  const regex = new RegExp(
+    `\\[\\[(${styleNames})\\|(.+?)\\]\\]` +          // 1 style,  2 body
+      `|\\{\\{(${inkNames})\\|(.+?)\\}\\}` +         // 3 colour, 4 body
+      "|(?<!!)\\[([^\\]]+)\\]\\(([^)]+)\\)" +        // 5 label,  6 href
+      `|==(?:(${markerNames}):)?(.+?)==` +           // 7 marker, 8 body
+      "|\\*\\*([^*]+)\\*\\*" +                       // 9 bold
+      "|__(.+?)__" +                                 // 10 underline
+      "|\\*([^*]+)\\*" +                             // 11 italic
+      "|`([^`]+)`",                                  // 12 code
+    "g"
+  );
+
   const nodes: TiptapNode[] = [];
-  const regex = /(\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`|(?<!!)\[([^\]]+)\]\(([^)]+)\))/g;
+  const plain = (t: string) => { if (t) nodes.push({ type: "text", text: t }); };
+  // Re-parse the inner text, then add this mark to everything it produced.
+  const wrap = (body: string, mark: TiptapMark) => {
+    for (const child of parseInline(body)) {
+      nodes.push({ ...child, marks: [...(child.marks ?? []), mark] });
+    }
+  };
+
   let last = 0;
   let m: RegExpExecArray | null;
-  const push = (t: string, mark?: string) => {
-    if (!t) return;
-    nodes.push(mark ? { type: "text", text: t, marks: [{ type: mark }] } : { type: "text", text: t });
-  };
   while ((m = regex.exec(text))) {
-    push(text.slice(last, m.index));
-    if (m[2] !== undefined) push(m[2], "bold");
-    else if (m[3] !== undefined) push(m[3], "italic");
-    else if (m[4] !== undefined) push(m[4], "code");
-    else if (m[5] !== undefined) nodes.push({ type: "text", text: m[5], marks: [{ type: "link", attrs: { href: m[6] } }] });
+    plain(text.slice(last, m.index));
+    if (m[2] !== undefined) wrap(m[2], { type: "zeniTextStyle", attrs: { styleName: m[1] } });
+    else if (m[4] !== undefined) wrap(m[4], { type: "zeniTextColor", attrs: { colorName: m[3] } });
+    else if (m[5] !== undefined) wrap(m[5], { type: "link", attrs: { href: m[6] } });
+    else if (m[8] !== undefined) wrap(m[8], { type: "highlight", attrs: { color: m[7] ?? "yellow" } });
+    else if (m[9] !== undefined) wrap(m[9], { type: "bold" });
+    else if (m[10] !== undefined) wrap(m[10], { type: "underline" });
+    else if (m[11] !== undefined) wrap(m[11], { type: "italic" });
+    else if (m[12] !== undefined) wrap(m[12], { type: "code" });
     last = m.index + m[0].length;
   }
-  push(text.slice(last));
+  plain(text.slice(last));
   return nodes;
+}
+
+// `| a | b |` → cell strings, honouring \| escapes. The outer pipes produce
+// leading/trailing empties, which are dropped; interior empties are kept so
+// columns stay aligned.
+export function splitTableRow(line: string): string[] {
+  const cells: string[] = [];
+  let cur = "";
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === "\\" && line[i + 1] === "|") { cur += "|"; i++; continue; }
+    if (line[i] === "|") { cells.push(cur); cur = ""; continue; }
+    cur += line[i];
+  }
+  cells.push(cur);
+  if (cells.length && cells[0].trim() === "") cells.shift();
+  if (cells.length && cells[cells.length - 1].trim() === "") cells.pop();
+  return cells.map((c) => c.trim());
 }
 
 // Stored markdown → editor JSON (reuses parseContent so it stays in lockstep
@@ -367,7 +596,31 @@ export function markdownToDoc(raw: string): TiptapDoc {
     if (b.type === "code")
       return { type: "codeBlock", content: b.text ? [{ type: "text", text: b.text }] : [] };
     if (b.type === "image")
-      return { type: "image", attrs: { src: b.src ?? "", alt: b.alt ?? "" } };
+      return { type: "image", attrs: { src: b.src ?? "", alt: b.alt ?? "", title: b.caption ?? "" } };
+    if (b.type === "list")
+      return {
+        type: b.ordered ? "orderedList" : "bulletList",
+        content: (b.items ?? []).map((item) => ({
+          type: "listItem",
+          content: [{ type: "paragraph", content: parseInline(item) }],
+        })),
+      };
+    if (b.type === "table") {
+      const lines = b.text.split("\n").filter((l) => l.trim());
+      // Drop the |---|---| separator; it carries no content.
+      const isSeparator = (l: string) => /^[|\s:-]+$/.test(l) && l.includes("-");
+      const rows = lines.filter((l) => !isSeparator(l.trim()));
+      return {
+        type: "table",
+        content: rows.map((line, rowIndex) => ({
+          type: "tableRow",
+          content: splitTableRow(line).map((cell) => ({
+            type: rowIndex === 0 ? "tableHeader" : "tableCell",
+            content: [{ type: "paragraph", content: parseInline(cell) }],
+          })),
+        })),
+      };
+    }
     return { type: "paragraph", content: parseInline(b.text) };
   });
   return { type: "doc", content: content.length ? content : [{ type: "paragraph" }] };

@@ -1,6 +1,6 @@
 Admin
 admin@nextzeni.com
-admin123
+    admin123
 
 Writer (Shreyas)
 shreyas@example.com

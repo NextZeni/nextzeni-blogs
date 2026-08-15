@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@/data/dummy";
+import AppBootSkeleton from "@/components/AppBootSkeleton";
 import { db, auth } from "@/lib/firebase";
 import {
   collection, doc, getDoc, setDoc, onSnapshot, updateDoc,
@@ -14,6 +15,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   sendEmailVerification,
+  sendPasswordResetEmail,
   onAuthStateChanged
 } from "firebase/auth";
 
@@ -32,9 +34,12 @@ interface SignupData {
 interface AuthContextValue {
   user: User | null;
   users: User[];
+  /** True until the first users snapshot arrives — drives profile skeletons. */
+  usersLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string; cancelled?: boolean }>;
   signup: (data: SignupData) => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   toggleUserActive: (userId: string) => void;
@@ -157,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [ready, setReady] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   // Seed default users in Firestore if needed
   useEffect(() => {
@@ -239,9 +245,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Real-time listener for all users
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, USERS_COL), (snap) => {
-      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as User)));
-    });
+    const unsub = onSnapshot(
+      collection(db, USERS_COL),
+      (snap) => {
+        setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as User)));
+        setUsersLoading(false);
+      },
+      (err) => {
+        console.error("Users fetch error:", err);
+        setUsersLoading(false);
+      }
+    );
     return unsub;
   }, []);
 
@@ -377,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function loginWithGoogle(): Promise<{ success: boolean; error?: string }> {
+  async function loginWithGoogle(): Promise<{ success: boolean; error?: string; cancelled?: boolean }> {
     try {
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
@@ -422,7 +436,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true };
     } catch (err: any) {
       console.error("Google login error:", err);
-      return { success: false, error: err.message || "Failed to sign in with Google." };
+
+      // Dismissing the popup is a deliberate user action, not an error.
+      if (
+        err.code === "auth/popup-closed-by-user" ||
+        err.code === "auth/cancelled-popup-request" ||
+        err.code === "auth/user-cancelled"
+      ) {
+        return { success: false, cancelled: true };
+      }
+
+      let msg = "Failed to sign in with Google. Please try again.";
+      if (err.code === "auth/unauthorized-domain") {
+        // This domain is missing from Firebase Auth → Settings → Authorized domains.
+        msg = "Google sign-in isn't available on this domain yet. Please contact support.";
+      } else if (err.code === "auth/popup-blocked") {
+        msg = "Your browser blocked the sign-in popup. Please allow popups for this site and try again.";
+      } else if (err.code === "auth/account-exists-with-different-credential") {
+        msg = "An account with this email already exists. Please sign in with your email and password.";
+      } else if (err.code === "auth/operation-not-allowed") {
+        msg = "Google sign-in is not enabled for this app. Please contact support.";
+      } else if (err.code === "auth/network-request-failed") {
+        msg = "Network error. Please check your connection and try again.";
+      }
+      return { success: false, error: msg };
     }
   }
 
@@ -472,6 +509,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         msg = "The password is too weak. Please use a stronger password.";
       } else if (err.code === "auth/invalid-email") {
         msg = "The email address is invalid.";
+      }
+      return { success: false, error: msg };
+    }
+  }
+
+  async function resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Password reset error:", err);
+      // Don't reveal whether an account exists for this address.
+      if (err.code === "auth/user-not-found") {
+        return { success: true };
+      }
+      let msg = "Could not send the reset link. Please try again.";
+      if (err.code === "auth/invalid-email") {
+        msg = "The email address is invalid.";
+      } else if (err.code === "auth/too-many-requests") {
+        msg = "Too many attempts. Please wait a few minutes and try again.";
       }
       return { success: false, error: msg };
     }
@@ -550,16 +607,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  if (!ready) return null;
+  // Firebase Auth hasn't resolved yet — shimmer the shell instead of a blank page.
+  if (!ready) return <AppBootSkeleton />;
 
   return (
     <AuthContext.Provider
       value={{
         user,
         users,
+        usersLoading,
         login,
         loginWithGoogle,
         signup,
+        resetPassword,
         logout,
         updateUser,
         toggleUserActive,

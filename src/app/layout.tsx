@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { BlogProvider } from "@/context/BlogContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { SITE_URL } from "@/lib/seo";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "NextZeni — Read. Write. Grow.",
   description:
     "NextZeni is a platform where curious minds share knowledge, grow an audience, and earn from their expertise. Publish articles, access tools, and discover ideas across technology, finance, science, culture, and more.",

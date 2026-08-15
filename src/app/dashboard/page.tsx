@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { ProfilePageSkeleton } from "@/components/PageSkeletons";
 
 export default function DashboardRedirect() {
   const { user } = useAuth();
@@ -16,9 +17,7 @@ export default function DashboardRedirect() {
     }
   }, [user, router]);
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center font-sans">
-      <p className="text-secondary text-sm font-medium animate-pulse">Redirecting to profile dashboard...</p>
-    </div>
-  );
+  // Shimmer the profile shell we're about to land on, so the hop reads as one
+  // continuous load instead of a blank interstitial.
+  return <ProfilePageSkeleton />;
 }

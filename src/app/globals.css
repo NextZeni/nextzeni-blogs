@@ -94,6 +94,49 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
+  /* ── Shimmer skeletons ──
+     A tinted block with a compositor-friendly light sweep on top.
+     Layout (size, radius, spacing) comes from utilities at the call site. */
+  @keyframes shimmerSweep {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(100%); }
+  }
+
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background-color: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+  }
+
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, #ffffff 70%, transparent) 50%,
+      transparent 100%
+    );
+    animation: shimmerSweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  /* Stagger sibling blocks so a list reads as one wave, not a flicker */
+  .shimmer-group > *:nth-child(2) .shimmer::after { animation-delay: 0.08s; }
+  .shimmer-group > *:nth-child(3) .shimmer::after { animation-delay: 0.16s; }
+  .shimmer-group > *:nth-child(4) .shimmer::after { animation-delay: 0.24s; }
+  .shimmer-group > *:nth-child(5) .shimmer::after { animation-delay: 0.32s; }
+  .shimmer-group > *:nth-child(n + 6) .shimmer::after { animation-delay: 0.4s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer::after {
+      animation: none;
+      opacity: 0;
+    }
+  }
+
   /* Article content formatting */
   .prose-zeni h2 {
     @apply serif text-2xl font-bold mt-10 mb-3 tracking-tight text-foreground;
@@ -161,6 +204,56 @@
 /* Links in editor and published article */
 .story-link {
   @apply text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent transition-colors;
+}
+
+/* Underline mark — a span rather than <u> so it never reads as a link */
+.story-underline,
+.ProseMirror u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Highlights keep text readable on every swatch */
+.ProseMirror mark,
+.prose-zeni mark {
+  @apply rounded px-0.5 text-foreground;
+}
+
+/* Lists — editor and published article */
+.ProseMirror ul,
+.prose-zeni ul {
+  @apply list-disc pl-6 my-3 space-y-1;
+}
+.ProseMirror ol,
+.prose-zeni ol {
+  @apply list-decimal pl-6 my-3 space-y-1;
+}
+.ProseMirror li p {
+  margin-bottom: 0.15rem;
+}
+
+/* Tables in the editor, styled to match renderTable()'s published output */
+.ProseMirror table {
+  @apply w-full my-6 text-sm border-collapse overflow-hidden rounded-xl border border-border;
+  table-layout: fixed;
+}
+.ProseMirror th,
+.ProseMirror td {
+  @apply relative border border-border/80 px-3 py-2 align-top;
+  min-width: 3rem;
+}
+.ProseMirror th {
+  @apply bg-secondary/5 font-semibold text-foreground text-left;
+}
+.ProseMirror .selectedCell::after {
+  @apply bg-accent/10 pointer-events-none absolute inset-0 z-10;
+  content: "";
+}
+.ProseMirror .column-resize-handle {
+  @apply bg-accent absolute -bottom-px -right-0.5 top-0 w-1 pointer-events-none;
+}
+.ProseMirror table p {
+  margin-bottom: 0;
 }
 
 /* Scrollbar styling */

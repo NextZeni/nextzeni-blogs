@@ -7,6 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useBlogs } from "@/context/BlogContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { ProfileSkeleton, StoryListSkeleton } from "@/components/PageSkeletons";
+import SmartImage from "@/components/SmartImage";
 import { getInitials, formatNum } from "@/data/dummy";
 import {
   Calendar, Users, FileText, ArrowRight, Eye, Heart, Edit3, MapPin, Globe,
@@ -91,8 +93,8 @@ const STATUS_CONFIG = {
 
 export default function ProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const { users, user: currentUser, toggleFollowUser, updateUser } = useAuth();
-  const { blogs, deleteBlog } = useBlogs();
+  const { users, usersLoading, user: currentUser, toggleFollowUser, updateUser } = useAuth();
+  const { blogs, loading: blogsLoading, deleteBlog } = useBlogs();
 
   const [followLoading, setFollowLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -249,6 +251,18 @@ export default function ProfilePage() {
       window.history.pushState({}, "", url.toString());
     }
   };
+
+  // Users stream in from Firestore — shimmer the profile rather than
+  // flashing "user not found" before the snapshot lands.
+  if (!profileUser && usersLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col font-sans">
+        <Header />
+        <ProfileSkeleton />
+        <Footer />
+      </div>
+    );
+  }
 
   if (!profileUser) {
     return (
@@ -488,15 +502,14 @@ export default function ProfilePage() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-5">
                   <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-accent/15 flex items-center justify-center text-2xl md:text-3xl font-extrabold text-accent flex-shrink-0 shadow-inner">
-                    {profileUser.profilePic ? (
-                      <img
-                        src={profileUser.profilePic}
-                        alt={fullName}
-                        className="w-full h-full object-cover rounded-full"
-                      />
-                    ) : (
-                      initials
-                    )}
+                    <SmartImage
+                      src={profileUser.profilePic}
+                      alt={fullName}
+                      loading="eager"
+                      wrapperClassName="w-full h-full rounded-full"
+                      className="w-full h-full object-cover rounded-full"
+                      fallback={<>{initials}</>}
+                    />
                   </div>
                   <div>
                     <div className="flex items-center gap-3 flex-wrap">
@@ -702,7 +715,9 @@ export default function ProfilePage() {
                 </Link>
               </div>
 
-              {myAllBlogs.length === 0 ? (
+              {blogsLoading ? (
+                <StoryListSkeleton rows={3} />
+              ) : myAllBlogs.length === 0 ? (
                 <div className="py-16 text-center border border-dashed border-border rounded-2xl bg-white">
                   <PenLine size={32} className="text-secondary/30 mx-auto mb-3" />
                   <p className="text-secondary text-sm mb-4">You haven&apos;t written any stories yet.</p>
@@ -718,11 +733,13 @@ export default function ProfilePage() {
                     return (
                       <div key={blog.id} className="p-5 flex items-start gap-4 hover:bg-secondary/2 transition-colors">
                         <div className="w-16 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-secondary/8 flex items-center justify-center border border-border/40">
-                          {blog.coverImage ? (
-                            <img src={blog.coverImage} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="serif text-xl font-bold text-secondary/25">{blog.title[0]}</span>
-                          )}
+                          <SmartImage
+                            src={blog.coverImage}
+                            className="w-full h-full object-cover"
+                            fallback={
+                              <span className="serif text-xl font-bold text-secondary/25">{blog.title[0]}</span>
+                            }
+                          />
                         </div>
 
                         <div className="flex-1 min-w-0">
@@ -803,7 +820,9 @@ export default function ProfilePage() {
               Stories by {profileUser.firstName}
             </h2>
 
-            {authorBlogs.length === 0 ? (
+            {blogsLoading ? (
+              <StoryListSkeleton rows={3} />
+            ) : authorBlogs.length === 0 ? (
               <div className="py-16 text-center border border-dashed border-border rounded-2xl bg-white">
                 <FileText size={32} className="text-secondary/30 mx-auto mb-3" />
                 <p className="text-secondary text-sm">This author hasn&apos;t published any stories yet.</p>
@@ -857,7 +876,7 @@ export default function ProfilePage() {
                           href={`/article/${article.id}`}
                           className="block w-24 h-24 sm:w-32 sm:h-20 rounded-xl overflow-hidden bg-secondary/5 border border-border/40 flex-shrink-0"
                         >
-                          <img
+                          <SmartImage
                             src={article.coverImage}
                             alt={article.title}
                             className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"

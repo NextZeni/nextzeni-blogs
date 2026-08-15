@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
 import { CheckCircle, XCircle, Eye, Clock, Hourglass, LayoutDashboard, Trash, Plus } from "lucide-react";
+import { AdminListSkeleton } from "@/components/PageSkeletons";
+import { Skeleton } from "@/components/Skeleton";
+import SmartImage from "@/components/SmartImage";
 
 type FilterTab = "pending" | "published" | "rejected" | "all";
 
@@ -34,17 +37,21 @@ export default function AdminBlogsPage() {
     }
   }
 
+  // Drafts are the writer's private work-in-progress — they only reach this
+  // queue once the writer submits them.
+  const submissions = useMemo(() => blogs.filter((b) => b.status !== "draft"), [blogs]);
+
   const filtered = useMemo(() => {
-    if (tab === "all") return blogs;
-    return blogs.filter((b) => b.status === tab);
-  }, [blogs, tab]);
+    if (tab === "all") return submissions;
+    return submissions.filter((b) => b.status === tab);
+  }, [submissions, tab]);
 
   const counts = useMemo(() => ({
-    pending: blogs.filter((b) => b.status === "pending").length,
-    published: blogs.filter((b) => b.status === "published").length,
-    rejected: blogs.filter((b) => b.status === "rejected").length,
-    all: blogs.length,
-  }), [blogs]);
+    pending: submissions.filter((b) => b.status === "pending").length,
+    published: submissions.filter((b) => b.status === "published").length,
+    rejected: submissions.filter((b) => b.status === "rejected").length,
+    all: submissions.length,
+  }), [submissions]);
 
   async function handleApprove(id: string) {
     setActionId(id);
@@ -123,7 +130,7 @@ export default function AdminBlogsPage() {
         </div>
 
         {/* List */}
-        {loading && <div className="py-16 text-center text-secondary">Loading…</div>}
+        {loading && <AdminListSkeleton rows={3} />}
 
         {!loading && filtered.length === 0 && (
           <div className="py-16 text-center border border-dashed border-border rounded-2xl">
@@ -137,11 +144,13 @@ export default function AdminBlogsPage() {
               <div className="flex gap-4 items-start">
                 {/* Cover */}
                 <div className="w-20 h-14 flex-shrink-0 rounded-xl overflow-hidden bg-secondary/8 flex items-center justify-center">
-                  {blog.coverImage ? (
-                    <img src={blog.coverImage} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="serif text-3xl font-bold text-secondary/20">{blog.title[0]}</span>
-                  )}
+                  <SmartImage
+                    src={blog.coverImage}
+                    className="w-full h-full object-cover"
+                    fallback={
+                      <span className="serif text-3xl font-bold text-secondary/20">{blog.title[0]}</span>
+                    }
+                  />
                 </div>
 
                 {/* Info */}
@@ -232,7 +241,14 @@ export default function AdminBlogsPage() {
 
             {/* Categories list */}
             <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
-              {categories.length === 0 ? (
+              {loading && categories.length === 0 ? (
+                <div className="space-y-2" role="status" aria-busy="true">
+                  <span className="sr-only">Loading categories</span>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : categories.length === 0 ? (
                 <p className="text-xs text-secondary italic">No categories created yet.</p>
               ) : (
                 categories.map((cat) => (

@@ -3,17 +3,29 @@
 import { useState, useMemo } from "react";
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
-import { Bookmark, Search, Heart, PenLine, ArrowRight, LayoutDashboard, ShieldCheck, Eye } from "lucide-react";
+import { Bookmark, Search, Heart, PenLine, LayoutDashboard, ShieldCheck, Eye } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { FeedSkeleton } from "@/components/PageSkeletons";
+import SmartImage from "@/components/SmartImage";
+import FeaturedSlider from "@/components/FeaturedSlider";
+
+// How many of the newest stories ride the hero slider
+const SLIDE_COUNT = 5;
 
 function formatNum(n: number) {
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K";
   return String(n);
 }
 
+// Dates are stored as display strings ("Jul 21, 2026"), so sort on parsed time
+function dateValue(d: string) {
+  const t = Date.parse(d);
+  return Number.isNaN(t) ? 0 : t;
+}
+
 export default function Home() {
-  const { blogs, categories, incrementClaps, decrementClaps } = useBlogs();
+  const { blogs, categories, incrementClaps, decrementClaps, loading } = useBlogs();
   const { user, logout, toggleSaveArticle, toggleLikeArticle } = useAuth();
   const router = useRouter();
 
@@ -46,34 +58,40 @@ export default function Home() {
     });
   }, [blogs, activeCategory, search]);
 
-  // Group filtered articles by category (preserve categories order)
+  // Hero slider = the newest published stories, so freshly added blogs land
+  // here first and older ones roll off. Hidden while filtering or searching.
+  const sliderArticles = useMemo(() => {
+    if (activeCategory || search) return [];
+    return [...blogs]
+      .filter((b) => b.status === "published")
+      .sort((a, b) => dateValue(b.date) - dateValue(a.date))
+      .slice(0, SLIDE_COUNT);
+  }, [blogs, activeCategory, search]);
+
+  // Group filtered articles by category (preserve categories order).
+  // Stories already on the slider are skipped so the feed doesn't repeat them.
   const grouped = useMemo(() => {
+    const sliderIds = new Set(sliderArticles.map((a) => a.id));
+    const rest = filtered.filter((b) => !sliderIds.has(b.id));
     const map = new Map<string, typeof filtered>();
     for (const cat of categories) {
-      const articles = filtered.filter((b) => b.category === cat);
+      const articles = rest.filter((b) => b.category === cat);
       if (articles.length) map.set(cat, articles);
     }
     // catch any category not in categories list
-    for (const b of filtered) {
+    for (const b of rest) {
       if (!categories.includes(b.category) && !map.has(b.category)) {
-        map.set(b.category, filtered.filter((x) => x.category === b.category));
+        map.set(b.category, rest.filter((x) => x.category === b.category));
       }
     }
     return map;
-  }, [filtered, categories]);
+  }, [filtered, categories, sliderArticles]);
 
   const usedCategories = useMemo(() => {
     return categories.filter((c) =>
       blogs.some((b) => b.category === c && b.status === "published")
     );
   }, [categories, blogs]);
-
-  // Featured = most claps among all blogs
-  const featured = useMemo(() =>
-    [...blogs].sort((a, b) => b.claps - a.claps)[0] ?? null
-  , [blogs]);
-
-  const showFeatured = !activeCategory && !search && featured;
 
   return (
     <div className="min-h-screen">
@@ -161,6 +179,11 @@ export default function Home() {
         {/* ── Feed ── */}
         <main className="flex-1 min-w-0 max-w-[720px]">
 
+          {loading ? (
+            <FeedSkeleton />
+          ) : (
+          <div className="animate-fade-in">
+
           {/* ── Category filter tabs ── */}
           <div className="flex gap-2 flex-wrap mb-8 pb-5 border-b border-border">
             <button
@@ -201,65 +224,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* ── Featured hero (only on "All" with no search) ── */}
-          {showFeatured && (
-            <div className="block mb-12">
-              <div className="rounded-2xl border border-border p-8 hover:border-foreground/20 transition-colors group">
-                <div className="flex items-center gap-2 mb-5 text-sm">
-                  <Link href={`/profile/${featured.authorId}`} className="flex items-center gap-2 hover:opacity-85 transition-opacity">
-                    <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[11px] font-bold text-accent">
-                      {featured.author[0]?.toUpperCase()}
-                    </div>
-                    <span className="font-medium text-foreground hover:text-accent transition-colors">{featured.author}</span>
-                  </Link>
-                  <span className="text-secondary">·</span>
-                  <span className="text-secondary">{featured.date}</span>
-                  <span className="ml-auto bg-accent/10 text-accent text-xs font-semibold px-3 py-0.5 rounded-full">
-                    Featured
-                  </span>
-                </div>
-                <Link href={`/article/${featured.id}`} className="block">
-                  <h2 className="serif text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-3 group-hover:underline underline-offset-4 decoration-1">
-                    {featured.title}
-                  </h2>
-                  <p className="text-secondary text-lg leading-relaxed mb-6 line-clamp-3">
-                    {featured.description}
-                  </p>
-                </Link>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="bg-secondary/8 px-3 py-1 rounded-full text-xs font-medium text-secondary">
-                      {featured.category}
-                    </span>
-                    <span className="text-xs text-secondary">{featured.readingTime}</span>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleLikeArticle(featured.id);
-                      }}
-                      className={`flex items-center gap-1 text-xs transition-colors cursor-pointer ${
-                        user?.likedArticles?.includes(featured.id)
-                          ? "text-accent font-semibold"
-                          : "text-secondary hover:text-foreground"
-                      }`}
-                      title={user ? (user.likedArticles?.includes(featured.id) ? "Unlike this story" : "Like this story") : "Sign in to like"}
-                    >
-                      <Heart
-                        size={12}
-                        fill={user?.likedArticles?.includes(featured.id) ? "currentColor" : "none"}
-                      />{" "}
-                      {formatNum(featured.claps)}
-                    </button>
-                    <span className="flex items-center gap-1 text-xs text-secondary/70">
-                      <Eye size={12} /> {formatNum(featured.views ?? 0)}
-                    </span>
-                  </div>
-                  <Link href={`/article/${featured.id}`} className="text-sm text-accent font-medium flex items-center gap-1.5 group-hover:gap-2.5 transition-all">
-                    Read <ArrowRight size={14} />
-                  </Link>
-                </div>
-              </div>
-            </div>
+          {/* ── Featured slider: newest stories (only on "All" with no search) ── */}
+          {sliderArticles.length > 0 && (
+            <FeaturedSlider
+              articles={sliderArticles}
+              likedIds={user?.likedArticles ?? []}
+              onLike={handleLikeArticle}
+            />
           )}
 
           {/* ── Category-wise sections ── */}
@@ -356,17 +327,15 @@ export default function Home() {
                         href={`/article/${article.id}`}
                         className="hidden sm:flex w-20 h-14 flex-shrink-0 rounded-lg bg-secondary/6 hover:bg-secondary/12 transition-colors items-center justify-center overflow-hidden"
                       >
-                        {article.coverImage ? (
-                          <img
-                            src={article.coverImage}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="serif text-3xl font-bold text-secondary/15 select-none">
-                            {article.title[0]}
-                          </span>
-                        )}
+                        <SmartImage
+                          src={article.coverImage}
+                          className="w-full h-full object-cover"
+                          fallback={
+                            <span className="serif text-3xl font-bold text-secondary/15 select-none">
+                              {article.title[0]}
+                            </span>
+                          }
+                        />
                       </Link>
                     </div>
                   </article>
@@ -374,6 +343,9 @@ export default function Home() {
               </div>
             </section>
           ))}
+
+          </div>
+          )}
         </main>
 
         {/* ── Sidebar ── */}
@@ -393,28 +365,6 @@ export default function Home() {
                 <PenLine size={14} />
                 New story
               </Link>
-            </div>
-
-            {/* Topics */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-4">
-                Explore topics
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {usedCategories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
-                    className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      activeCategory === cat
-                        ? "bg-button text-white"
-                        : "bg-secondary/8 text-foreground hover:bg-secondary/15"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Footer */}

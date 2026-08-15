@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { KeyRound, Mail, ArrowLeft, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { AuthFormSkeleton } from "@/components/PageSkeletons";
 
 function LoginForm() {
   const { login, loginWithGoogle } = useAuth();
@@ -70,7 +71,7 @@ function LoginForm() {
         setTimeout(() => {
           router.push("/");
         }, 800);
-      } else {
+      } else if (!res.cancelled) {
         setError(res.error ?? "Failed to sign in with Google.");
       }
     } catch (err) {
@@ -178,6 +179,12 @@ function LoginForm() {
                     <label className="block text-sm font-semibold text-foreground">
                       Password
                     </label>
+                    <Link
+                      href="/auth/forgot-password"
+                      className="text-sm font-semibold text-accent hover:opacity-85 transition-opacity"
+                    >
+                      Forgot password?
+                    </Link>
                   </div>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-secondary/40 pointer-events-none">
@@ -228,7 +235,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-surface flex items-center justify-center font-sans text-secondary">Loading...</div>}>
+    <Suspense fallback={<AuthFormSkeleton />}>
       <LoginForm />
     </Suspense>
   );

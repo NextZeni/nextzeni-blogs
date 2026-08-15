@@ -7,6 +7,7 @@ import {
   ChevronRight, UploadCloud, FileText, X, Loader2,
 } from "lucide-react";
 import { analyzeResume, type ResumeResult } from "@/lib/ats";
+import { ScanResultSkeleton } from "@/components/PageSkeletons";
 import { useAuth } from "@/context/AuthContext";
 
 /* ─── File → plain text ─────────────────────────────────────────────────────── */
@@ -233,6 +234,9 @@ export default function ATSCheckerPage() {
             )}
           </div>
         )}
+
+        {/* Scanning — shimmer the report we're about to fill in */}
+        {loading && !result && <ScanResultSkeleton />}
 
         {/* Results */}
         {result && (
