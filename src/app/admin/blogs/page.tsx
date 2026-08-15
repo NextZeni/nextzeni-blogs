@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, startTransition, ViewTransition } from "react";
 import Link from "next/link";
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
@@ -85,7 +85,7 @@ export default function AdminBlogsPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
+      <header className="site-header sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
         <div className="max-w-[1100px] mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-extrabold tracking-tighter flex items-baseline">
             <span className="font-light text-secondary">Next</span><span>Zeni</span>
@@ -119,7 +119,7 @@ export default function AdminBlogsPage() {
           {(["pending", "published", "rejected", "all"] as FilterTab[]).map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => startTransition(() => setTab(t))}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${
                 tab === t ? "bg-button text-white" : "bg-secondary/8 text-secondary hover:bg-secondary/15"
               }`}
@@ -129,6 +129,14 @@ export default function AdminBlogsPage() {
           ))}
         </div>
 
+        <ViewTransition
+          key={tab}
+          name="admin-list"
+          share="auto"
+          enter="auto"
+          default="none"
+        >
+        <div>
         {/* List */}
         {loading && <AdminListSkeleton rows={3} />}
 
@@ -214,6 +222,8 @@ export default function AdminBlogsPage() {
             </div>
           ))}
         </div>
+        </div>
+        </ViewTransition>
           </div>
 
           {/* Sidebar Area: Categories Manager */}

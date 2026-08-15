@@ -504,7 +504,7 @@ function WritePageInner() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
+      <header className="site-header sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
         <div className="max-w-[860px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <Link href="/" className="text-secondary hover:text-foreground transition-colors">

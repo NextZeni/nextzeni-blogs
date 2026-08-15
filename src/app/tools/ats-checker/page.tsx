@@ -150,7 +150,7 @@ export default function ATSCheckerPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
+      <header className="site-header sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
         <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
           <Link href="/" className="text-2xl font-extrabold tracking-tighter flex items-baseline flex-shrink-0">
             <span className="font-light text-secondary">Next</span><span className="text-foreground">Zeni</span>

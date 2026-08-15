@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, ViewTransition } from "react";
 import { useBlogs } from "@/context/BlogContext";
 import { parseContent, renderInline, renderTable } from "@/data/dummy";
 import {
@@ -335,7 +335,7 @@ export default function ArticleView() {
   return (
     <div className="min-h-screen bg-background">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
+      <header className="site-header sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
         <div className="max-w-[1300px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-5">
             <Link href="/" className="text-secondary hover:text-foreground transition-colors"><ArrowLeft size={20} /></Link>
@@ -668,14 +668,16 @@ export default function ArticleView() {
               )}
 
               {article.coverImage && (
-                <div className="mt-6 rounded-2xl overflow-hidden aspect-video relative max-w-full bg-secondary/5 border border-border/40">
-                  <SmartImage
-                    src={article.coverImage}
-                    alt={article.title}
-                    loading="eager"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <ViewTransition name={`story-cover-${article.id}`}>
+                  <div className="mt-6 rounded-2xl overflow-hidden aspect-video relative max-w-full bg-secondary/5 border border-border/40">
+                    <SmartImage
+                      src={article.coverImage}
+                      alt={article.title}
+                      loading="eager"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </ViewTransition>
               )}
 
               {/* reaction bar */}

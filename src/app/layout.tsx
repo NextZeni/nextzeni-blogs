@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ViewTransition } from "react";
 import "./globals.css";
 import { BlogProvider } from "@/context/BlogContext";
 import { AuthProvider } from "@/context/AuthContext";
@@ -35,7 +36,11 @@ export default function RootLayout({
       </head>
       <body className="antialiased bg-background text-foreground">
         <AuthProvider>
-          <BlogProvider>{children}</BlogProvider>
+          <BlogProvider>
+            <ViewTransition default="none" enter="auto" exit="auto">
+              {children}
+            </ViewTransition>
+          </BlogProvider>
         </AuthProvider>
       </body>
     </html>

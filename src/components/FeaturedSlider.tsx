@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, ViewTransition } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ArrowRight, Heart, Eye } from "lucide-react";
 import { Article } from "@/data/dummy";
@@ -89,7 +89,7 @@ export default function FeaturedSlider({ articles, likedIds = [], onLike }: Prop
       <div className="relative rounded-2xl border border-border overflow-hidden group">
         {/* ── Track ── */}
         <div
-          className="flex transition-transform duration-500 ease-out motion-reduce:transition-none"
+          className="flex transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={{ transform: `translateX(-${index * 100}%)` }}
           onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
           onTouchEnd={(e) => {
@@ -115,18 +115,22 @@ export default function FeaturedSlider({ articles, likedIds = [], onLike }: Prop
                   tabIndex={i === index ? undefined : -1}
                   className="block relative h-[200px] sm:h-[280px] bg-secondary/6 overflow-hidden"
                 >
-                  <SmartImage
-                    src={article.coverImage}
-                    className="w-full h-full object-cover"
-                    loading={i === 0 ? "eager" : "lazy"}
-                    fallback={
-                      <span className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent/10 via-secondary/5 to-transparent">
-                        <span className="serif text-[120px] leading-none font-bold text-accent/15 select-none">
-                          {article.title[0]}
-                        </span>
-                      </span>
-                    }
-                  />
+                  <ViewTransition name={`story-cover-${article.id}`}>
+                    <span className="block w-full h-full">
+                      <SmartImage
+                        src={article.coverImage}
+                        className="w-full h-full object-cover"
+                        loading={i === 0 ? "eager" : "lazy"}
+                        fallback={
+                          <span className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent/10 via-secondary/5 to-transparent">
+                            <span className="serif text-[120px] leading-none font-bold text-accent/15 select-none">
+                              {article.title[0]}
+                            </span>
+                          </span>
+                        }
+                      />
+                    </span>
+                  </ViewTransition>
 
 
                   <div className="absolute top-4 left-4 flex items-center gap-2">

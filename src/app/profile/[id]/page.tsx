@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, startTransition, ViewTransition } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -244,7 +244,7 @@ export default function ProfilePage() {
   }
 
   const handleTabChange = (tab: "stories" | "dashboard") => {
-    setActiveTab(tab);
+    startTransition(() => setActiveTab(tab));
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("tab", tab);
@@ -685,6 +685,14 @@ export default function ProfilePage() {
         )}
 
         {/* Tab Content Display */}
+        <ViewTransition
+          key={activeTab}
+          name="profile-tab"
+          share="auto"
+          enter="auto"
+          default="none"
+        >
+        <div>
         {activeTab === "dashboard" && currentUser && currentUser.id === profileUser.id ? (
           /* WRITER DASHBOARD TAB */
           <div className="space-y-10 animate-fade-in">
@@ -876,11 +884,15 @@ export default function ProfilePage() {
                           href={`/article/${article.id}`}
                           className="block w-24 h-24 sm:w-32 sm:h-20 rounded-xl overflow-hidden bg-secondary/5 border border-border/40 flex-shrink-0"
                         >
-                          <SmartImage
-                            src={article.coverImage}
-                            alt={article.title}
-                            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-                          />
+                          <ViewTransition name={`story-cover-${article.id}`}>
+                            <span className="block w-full h-full">
+                              <SmartImage
+                                src={article.coverImage}
+                                alt={article.title}
+                                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                              />
+                            </span>
+                          </ViewTransition>
                         </Link>
                       )}
                     </div>
@@ -890,6 +902,8 @@ export default function ProfilePage() {
             )}
           </div>
         )}
+        </div>
+        </ViewTransition>
       </main>
 
       <Footer />

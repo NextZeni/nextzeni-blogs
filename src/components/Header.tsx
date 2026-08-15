@@ -52,7 +52,7 @@ export default function Header() {
   const fullName = user ? `${user.firstName} ${user.lastName}` : "";
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm">
+    <header className="site-header sticky top-0 z-50 bg-white border-b border-border shadow-sm">
       {/* Top bar */}
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
         {/* Logo */}

@@ -94,6 +94,10 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
+  .site-header {
+    view-transition-name: site-header;
+  }
+
   /* ── Shimmer skeletons ──
      A tinted block with a compositor-friendly light sweep on top.
      Layout (size, radius, spacing) comes from utilities at the call site. */
@@ -292,4 +296,31 @@
 
 @utility animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Short, quiet crossfade when moving between pages or filter tabs */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: ease-out;
+}
+
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }

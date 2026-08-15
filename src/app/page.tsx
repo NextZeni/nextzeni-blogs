@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, startTransition, ViewTransition } from "react";
 import { useBlogs } from "@/context/BlogContext";
 import { useAuth } from "@/context/AuthContext";
 import { Bookmark, Search, Heart, PenLine, LayoutDashboard, ShieldCheck, Eye } from "lucide-react";
@@ -96,7 +96,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
+      <header className="site-header sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
         <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
           <Link href="/" className="text-2xl font-extrabold tracking-tighter flex-shrink-0 flex items-baseline gap-0">
             <span className="font-light text-secondary">Next</span><span className="text-foreground">Zeni</span>
@@ -187,7 +187,7 @@ export default function Home() {
           {/* ── Category filter tabs ── */}
           <div className="flex gap-2 flex-wrap mb-8 pb-5 border-b border-border">
             <button
-              onClick={() => setActiveCategory(null)}
+              onClick={() => startTransition(() => setActiveCategory(null))}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
                 !activeCategory
                   ? "bg-button text-white"
@@ -199,7 +199,7 @@ export default function Home() {
             {usedCategories.map((cat) => (
               <button
                 key={cat}
-                onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                onClick={() => startTransition(() => setActiveCategory(activeCategory === cat ? null : cat))}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
                   activeCategory === cat
                     ? "bg-button text-white"
@@ -216,7 +216,7 @@ export default function Home() {
             <div className="py-24 text-center">
               <p className="text-secondary mb-3">No stories match your search.</p>
               <button
-                onClick={() => { setSearch(""); setActiveCategory(null); }}
+                onClick={() => startTransition(() => { setSearch(""); setActiveCategory(null); })}
                 className="text-sm text-accent hover:underline"
               >
                 Clear filters
@@ -224,6 +224,14 @@ export default function Home() {
             </div>
           )}
 
+          <ViewTransition
+            key={activeCategory ?? "all"}
+            name="home-feed"
+            share="auto"
+            enter="auto"
+            default="none"
+          >
+          <div>
           {/* ── Featured slider: newest stories (only on "All" with no search) ── */}
           {sliderArticles.length > 0 && (
             <FeaturedSlider
@@ -244,7 +252,7 @@ export default function Home() {
                   </h2>
                   {!activeCategory && (
                     <button
-                      onClick={() => setActiveCategory(cat)}
+                      onClick={() => startTransition(() => setActiveCategory(cat))}
                       className="text-xs text-accent hover:underline"
                     >
                       See all
@@ -327,15 +335,19 @@ export default function Home() {
                         href={`/article/${article.id}`}
                         className="hidden sm:flex w-20 h-14 flex-shrink-0 rounded-lg bg-secondary/6 hover:bg-secondary/12 transition-colors items-center justify-center overflow-hidden"
                       >
-                        <SmartImage
-                          src={article.coverImage}
-                          className="w-full h-full object-cover"
-                          fallback={
-                            <span className="serif text-3xl font-bold text-secondary/15 select-none">
-                              {article.title[0]}
-                            </span>
-                          }
-                        />
+                        <ViewTransition name={`story-cover-${article.id}`}>
+                          <span className="block w-full h-full">
+                            <SmartImage
+                              src={article.coverImage}
+                              className="w-full h-full object-cover"
+                              fallback={
+                                <span className="serif text-3xl font-bold text-secondary/15 select-none">
+                                  {article.title[0]}
+                                </span>
+                              }
+                            />
+                          </span>
+                        </ViewTransition>
                       </Link>
                     </div>
                   </article>
@@ -343,6 +355,8 @@ export default function Home() {
               </div>
             </section>
           ))}
+          </div>
+          </ViewTransition>
 
           </div>
           )}
